@@ -7,6 +7,7 @@ import {
     Clock, Download, CreditCard, MessageSquare,
     ExternalLink, Briefcase, Settings, Loader2
 } from 'lucide-react';
+import ProjectFileVault from '../components/ProjectFileVault';
 import { motion } from 'motion/react';
 
 export default function ProjectDetails() {
@@ -56,11 +57,14 @@ export default function ProjectDetails() {
 
   if (!project) return null;
 
+  const currentStep = project.current_step !== undefined ? Number(project.current_step) : 0;
+
   const timelineSteps = [
-    { label: 'Discovery', status: 'completed', date: project.created_at },
-    { label: 'Estruturação', status: project.status === 'active' || project.status === 'completed' ? 'completed' : 'current' },
-    { label: 'Desenvolvimento', status: project.status === 'active' ? 'current' : project.status === 'completed' ? 'completed' : 'pending' },
-    { label: 'Lançamento', status: project.status === 'completed' ? 'completed' : 'pending' },
+    { label: 'Discovery', status: currentStep > 0 ? 'completed' : currentStep === 0 ? 'current' : 'pending' },
+    { label: 'Planejamento', status: currentStep > 1 ? 'completed' : currentStep === 1 ? 'current' : 'pending' },
+    { label: 'Desenvolvimento', status: currentStep > 2 ? 'completed' : currentStep === 2 ? 'current' : 'pending' },
+    { label: 'QA / Testes', status: currentStep > 3 ? 'completed' : currentStep === 3 ? 'current' : 'pending' },
+    { label: 'Entrega', status: currentStep >= 4 ? 'completed' : 'pending' },
   ];
 
   return (
@@ -137,20 +141,10 @@ export default function ProjectDetails() {
                 <div className="glass-card p-10 border-white/10">
                     <div className="flex justify-between items-center mb-8">
                         <h3 className="text-white font-bold uppercase tracking-widest text-xs">Entregáveis & Assets</h3>
-                        <span className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">0 Arquivos</span>
+                        <span className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">{project.assets?.length || 0} Arquivos</span>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex flex-col items-center justify-center p-12 bg-white/[0.02] border border-dashed border-white/10 rounded-[32px] text-center col-span-2">
-                             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-gray-600 mb-4">
-                                <FileText size={24} />
-                             </div>
-                             <h4 className="text-white font-bold text-sm tracking-widest uppercase">Repositório Vazio</h4>
-                             <p className="text-gray-500 font-medium text-xs mt-2 max-w-xs leading-relaxed">
-                                Os arquivos do projeto estarão disponíveis aqui conforme o avanço das etapas de desenvolvimento.
-                             </p>
-                        </div>
-                    </div>
+                    <ProjectFileVault assets={project.assets || []} />
                 </div>
             </div>
 

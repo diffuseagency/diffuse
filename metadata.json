@@ -1,6 +1,6 @@
 {
   "name": "DIFFUSE - SOLUÇÕES",
   "description": "Agência de desenvolvimento de ponta especializada em sistemas e aplicações web encantadoras, com foco em design sofisticado e alto desempenho.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": []
 }

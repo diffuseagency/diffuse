@@ -1,46 +1,52 @@
-# Especificação Técnica - Evolução do CMS
-**Data e Hora de Geração:** 07/05/2026 10:07 (Horário de Brasília)
+# Especificação Técnica (Pendências) - Diffuse Agency
+**Data e Hora de Geração:** 07/05/2026 11:00 (Horário de Brasília)
 
-## 1. Expansão de Esquema (Data Models)
+## 1. Novas Páginas (Pages)
 
-### 1.1 Coleção `settings` (Chaves Adicionais)
-- `about_manifesto` (string): Texto de abertura da página Sobre.
-- `about_vision` (string): Nossa Visão.
-- `about_mission` (string): Nossa Missão.
-- `about_dna` (string): Nosso DNA.
-- `seo_title` (string): Título global da aba.
-- `seo_description` (string): Descrição para motores de busca.
-- `analytics_id` (string): ID do Google Analytics.
+### 1.1. Portfolio Case Study (`/portfolio/:slug`)
+- **Objetivo:** Página pública detalhada para cada item do portfólio.
+- **Comportamento:** Slug dinâmico carregando dados da coleção `portfolio_details` ou campos estendidos na coleção `portfolio`.
+- **Componentes:**
+    - Hero com imagem de capa (parallax).
+    - Descrição do problema e solução técnica.
+    - Galeria de screenshots com zoom.
+    - Depoimento do cliente específico do projeto.
 
-### 1.2 Coleção `navigation` (Nova)
-- `label` (string): Nome do link (ex: "Home").
-- `path` (string): Rota (ex: "/").
-- `order` (number): Ordem de exibição.
-- `isActive` (boolean).
+### 1.2. Audio Engineering Lab (`/lab/audio`)
+- **Objetivo:** Showcase da especialidade técnica (Persona).
+- **Comportamento:** Interface interativa captando microfone (Web Audio API), aplicando filtros (BiquadFilterNode) e exibindo Analysers em tempo real.
+- **Integração:** Totalmente client-side para processamento real-time.
 
-## 2. Novos Componentes de Interface
+## 2. Novos Comportamentos (Behavior)
 
-### 2.1 `CMSInstitutional.tsx` (Sub-ABA)
-- **Objetivo:** Interface para edição dos campos da página Sobre.
-- **Componentes:** Rich Text Editors simples para os parágrafos do Manifesto e DNA.
+### 2.1. Gestão de Entregáveis (Admin -> Clientes)
+- **Fluxo:** No painel de Projetos (`/admin/projetos`), o admin deve poder anexar arquivos (PDF, ZIP, Imagens) a um projeto específico.
+- **Persistência:** Firebase Storage vinculado ao `projectId`.
 
-### 2.2 `CMSNavigation.tsx` (Sub-ABA)
-- **Objetivo:** Drag-and-drop ou Reorder list para gerenciar links do menu superior e rodapé.
+### 2.2. Atualização de Timeline do Projeto
+- **Fluxo:** No modal `ProjectForm`, adicionar um slider ou select para definir a "Etapa Atual" do projeto (0-4).
+- **Impacto:** Refletir diretamente na barra de progresso visual do `ProjectDetails.tsx` (Área do Cliente).
 
-### 2.3 `MediaLibrary.tsx` (Componente de Apoio)
-- **Objetivo:** Gerenciar uploads para Firebase Storage.
-- **Comportamento:** Ao clicar em um campo de imagem no CMS, abre um pop-over para upload ou seleção de mídia já enviada.
+### 2.3. Sistema de Logo Dinâmica
+- **Fluxo:** No CMS (`settings`), adicionar campo de upload `agency_logo`.
+- **Impacto:** Substituir o ícone "D" estático no `Navbar` e `Footer` pela imagem selecionada no CMS.
 
-## 3. Refatorações de Comportamento (Behavior)
+## 3. Novos Componentes (Components)
 
-### 3.1 Hook `useSiteSettings`
-- **Comportamento:** Singleton que carrega as configurações globais uma única vez no `App.tsx` e injeta via Context API ou Prop Drilling para evitar múltiplas leituras ao Firestore.
+### 3.1. `AudioProcessor.tsx`
+- Componente especializado em processamento de áudio com baixa latência.
+- Visualização de frequência (Oscilloscope) com `motion/react`.
 
-### 3.2 Dynamic Helmet (SEO)
-- **Integração:** Uso de `react-helmet-async` para injetar os metadados dinâmicos vindos do CMS em cada rota navegada.
+### 3.2. `ProjectFileVault.tsx`
+- Componente de listagem e download de arquivos com estados de loading e verificação de permissão.
 
-### 3.3 Dynamic Filters (Portfolio)
-- **Lógica:** O componente `Portfolio.tsx` deve gerar a lista de "Filtros/Categorias" baseando-se no `Set` de categorias único presente nos documentos da coleção `portfolio` retornados do banco.
+### 3.3. `LeadNotifier.tsx`
+- Sistema de sinalização sonora ou visual no Admin quando uma nova mensagem chegar em real-time.
+
+## 4. Ajustes de Dados (Data Models)
+- **`messages`:** Adicionar esquema formal ao `firebase-blueprint.json`.
+- **`portfolio`:** Adicionar campos `slug`, `full_description`, `challenge_text`, `solution_text`.
+- **`projects`:** Adicionar campo `current_step` (number) e `assets` (array of objects).
 
 ---
-*Fim da Especificação Técnica Focal em CMS.*
+*Fim da Especificação.*

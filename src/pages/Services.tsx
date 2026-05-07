@@ -3,6 +3,8 @@ import { Layout, Smartphone, Globe, Music, Code2, Rocket, Search, Database } fro
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useSiteSettings } from '../lib/useSiteSettings';
+import SEO from '../components/SEO';
 
 const iconMap: any = { Globe, Smartphone, Music, Search, Database, Code2, Rocket, Layout };
 
@@ -34,6 +36,7 @@ const ServiceItem = ({ icon: IconName, title, features, description }: { icon: s
 };
 
 export default function Services() {
+  const { settings } = useSiteSettings();
   const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
@@ -46,6 +49,7 @@ export default function Services() {
 
   return (
     <div className="pt-40 max-w-7xl mx-auto px-4">
+      <SEO title={`Serviços | ${settings.agency_name || 'Diffuse'}`} />
       <div className="mb-32">
         <span className="text-[10px] uppercase tracking-[0.4em] text-white/50 mb-4 block">Capacidades</span>
         <h1 className="text-7xl md:text-9xl font-display font-light mb-12 tracking-tighter italic text-gradient">Serviços</h1>

@@ -17,10 +17,12 @@ const projectSchema = z.object({
   title: z.string().min(2, 'Título muito curto'),
   client_id: z.string().min(1, 'Cliente obrigatório'),
   client_name: z.string().min(1, 'Nome do cliente obrigatório'),
+  client_email: z.string().email('E-mail do cliente inválido'),
   description: z.string().min(10, 'Descrição detalhada necessária'),
   budget: z.coerce.number().min(0, 'Orçamento inválido'),
   status: z.enum(['active', 'completed', 'on-hold', 'discovery']),
   deadline: z.string().optional(),
+  current_step: z.coerce.number().min(0).max(4).optional(),
 });
 
 const invoiceSchema = z.object({
@@ -113,7 +115,10 @@ export const ProjectForm = ({ initialData, clients, onSubmit, loading }: any) =>
           {...register('client_id')} 
           onChange={(e) => {
             const client = clients.find((c: any) => c.id === e.target.value);
-            if (client) setValue('client_name', client.name);
+            if (client) {
+              setValue('client_name', client.name);
+              setValue('client_email', client.email);
+            }
           }}
           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
         >
@@ -123,6 +128,7 @@ export const ProjectForm = ({ initialData, clients, onSubmit, loading }: any) =>
           ))}
         </select>
         <input type="hidden" {...register('client_name')} />
+        <input type="hidden" {...register('client_email')} />
         {errors.client_id && <p className="text-red-500 text-[10px] uppercase font-bold">{errors.client_id.message as string}</p>}
       </div>
       <div className="space-y-1">
@@ -145,6 +151,16 @@ export const ProjectForm = ({ initialData, clients, onSubmit, loading }: any) =>
             <option value="completed">Concluído</option>
           </select>
         </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Etapa Atual (Linha do tempo do Cliente)</label>
+        <select {...register('current_step')} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none">
+          <option value="0">1: Discovery & Briefing</option>
+          <option value="1">2: Planejamento & UX</option>
+          <option value="2">3: Desenvolvimento Ativo</option>
+          <option value="3">4: QA & Testes Finais</option>
+          <option value="4">5: Entrega & Lançamento</option>
+        </select>
       </div>
       <button type="submit" disabled={loading} className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-purple-500 transition-all shadow-lg flex items-center justify-center gap-2">
         {loading && <Loader2 size={16} className="animate-spin" />}

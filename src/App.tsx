@@ -19,35 +19,21 @@ import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import ProjectDetails from './pages/ProjectDetails';
+import ProjectDetailPublic from './pages/ProjectDetailPublic';
+import AudioLab from './pages/AudioLab';
 import AdminGuard from './components/AdminGuard';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
+import SEO from './components/SEO';
 
-import { HelmetProvider, Helmet } from 'react-helmet-async';
+import { HelmetProvider } from 'react-helmet-async';
 import { SiteSettingsProvider, useSiteSettings } from './lib/useSiteSettings';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 
-function SEO() {
-  const { settings } = useSiteSettings();
-  const defaultTitle = "Diffuse Agency | Elite Web Engineering";
-  const defaultDesc = "Transformando visão em realidade digital através de engenharia sênior e design de alta fidelidade.";
-  
-  return (
-    <Helmet>
-      <title>{settings.seo_title || defaultTitle}</title>
-      <meta name="description" content={settings.seo_description || defaultDesc} />
-      <meta property="og:title" content={settings.seo_title || defaultTitle} />
-      <meta property="og:description" content={settings.seo_description || defaultDesc} />
-      {settings.analytics_id && (
-        <script async src={`https://www.googletagmanager.com/gtag/js?id=${settings.analytics_id}`}></script>
-      )}
-    </Helmet>
-  );
-}
-
 const Navbar = () => {
+  const { settings } = useSiteSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
@@ -99,15 +85,25 @@ const Navbar = () => {
 
   if (isAdminPage) return null;
 
+  const agencyName = settings.agency_name || "Diffuse";
+
   return (
     <nav className="fixed w-full z-50 bg-white/5 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           <Link to="/" className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-lg flex items-center justify-center font-bold italic tracking-tighter transition-transform group-hover:scale-110">
-              <span className="text-white">D</span>
-            </div>
-            <span className="text-xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 group-hover:from-blue-400 group-hover:to-purple-400 transition-all uppercase">Diffuse</span>
+            {settings.agency_logo ? (
+              <img 
+                src={settings.agency_logo} 
+                alt={agencyName} 
+                className="h-10 w-auto object-contain transition-transform group-hover:scale-105" 
+              />
+            ) : (
+              <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-lg flex items-center justify-center font-bold italic tracking-tighter transition-transform group-hover:scale-110">
+                <span className="text-white">{agencyName.charAt(0)}</span>
+              </div>
+            )}
+            <span className="text-xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 group-hover:from-blue-400 group-hover:to-purple-400 transition-all uppercase">{agencyName}</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -270,6 +266,8 @@ function AppContent() {
             <Route path="/sobre" element={<About />} />
             <Route path="/servicos" element={<Services />} />
             <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/portfolio/:slug" element={<ProjectDetailPublic />} />
+            <Route path="/lab/audio" element={<AudioLab />} />
             <Route path="/contato" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import SEO from '../components/SEO';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -36,6 +37,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <SEO title="Login | Master Dashboard" />
       <div className="glass-card p-12 w-full max-w-sm">
         <h1 className="text-2xl font-bold text-white mb-8 text-center uppercase tracking-widest">
           {isSignup ? 'Cadastro Administrativo' : 'Login Administrativo'}

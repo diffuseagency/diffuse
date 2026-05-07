@@ -1,11 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Save, Plus, Trash2, Edit3, Image as ImageIcon, Type, Layout, Star, 
   MessageSquare, Loader2, Instagram, Linkedin, Github, Mail, Phone, MapPin,
-  Smartphone, Globe, Music, Code2, Rocket, Search, Database
+  Smartphone, Globe, Music, Code2, Rocket, Search, Database,
+  GripVertical
 } from 'lucide-react';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
 import { addFirestoreDoc, updateFirestoreDoc, deleteFirestoreDoc } from '../lib/cmsHooks';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MediaLibrary from '../components/MediaLibrary';
@@ -134,6 +143,44 @@ export default function CMSManager() {
     }
   };
 
+  const onDragEnd = async (result: any) => {
+    if (!result.destination) return;
+
+    const sourceIndex = result.source.index;
+    const destIndex = result.destination.index;
+    if (sourceIndex === destIndex) return;
+
+    const items = Array.from(filteredNavigation);
+    const [reorderedItem] = items.splice(sourceIndex, 1);
+    items.splice(destIndex, 0, reorderedItem);
+
+    // Optimized batch update local state immediately
+    const updatedNavigation = navigation.map(nav => {
+      if (nav.type !== navFilter) return nav;
+      const indexInFiltered = items.findIndex(i => i.id === nav.id);
+      if (indexInFiltered === -1) return nav;
+      return { ...nav, order: indexInFiltered };
+    });
+
+    setNavigation(updatedNavigation);
+
+    // Persist to Firebase
+    setLoading(true);
+    try {
+      const promises = items.map((item, index) => 
+        updateFirestoreDoc('navigation', item.id, { order: index })
+      );
+      await Promise.all(promises);
+      showMessage('Ordem atualizada!');
+    } catch (error) {
+      console.error("Reorder error:", error);
+      showMessage('Erro ao salvar nova ordem', 'error');
+      fetchData(); // Rollback
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreate = async (collectionName: string, item: any) => {
     setLoading(true);
     try {
@@ -205,6 +252,11 @@ export default function CMSManager() {
                     // Process features if it's a service
                     if (activeTab === 'services' && typeof data.features === 'string') {
                         data.features = data.features.split('\n').map((f: any) => f.trim()).filter((f: any) => f !== '');
+                    }
+
+                    // Process gallery if it's a portfolio item
+                    if (activeTab === 'portfolio' && typeof data.gallery === 'string') {
+                        data.gallery = data.gallery.split('\n').map((f: any) => f.trim()).filter((f: any) => f !== '');
                     }
                     
                     // Add icon if missing for services
@@ -285,17 +337,31 @@ export default function CMSManager() {
                         </>
                     )}
                     {activeTab === 'portfolio' && (
-                        <>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Título do Projeto</label>
-                                <input name="title" defaultValue={editingItem?.title} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4 scrollbar-hide">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Título do Projeto</label>
+                                    <input name="title" defaultValue={editingItem?.title} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Slug (URL amigável)</label>
+                                    <input name="slug" defaultValue={editingItem?.slug} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" placeholder="meu-projeto-premium" />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Categoria</label>
-                                <input name="category" defaultValue={editingItem?.category} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Categoria</label>
+                                    <input name="category" defaultValue={editingItem?.category} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Ano</label>
+                                    <input name="year" defaultValue={editingItem?.year} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
                             </div>
+
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">URL da Imagem</label>
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Imagem de Capa (Principal)</label>
                                 <div className="flex gap-2">
                                     <input 
                                         name="image" 
@@ -313,11 +379,39 @@ export default function CMSManager() {
                                     </button>
                                 </div>
                             </div>
+
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Ano</label>
-                                <input name="year" defaultValue={editingItem?.year} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Descrição Resumida (Intro)</label>
+                                <textarea name="full_description" defaultValue={editingItem?.full_description} rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
                             </div>
-                        </>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">O Desafio</label>
+                                    <textarea name="challenge_text" defaultValue={editingItem?.challenge_text} rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">A Solução</label>
+                                    <textarea name="solution_text" defaultValue={editingItem?.solution_text} rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Galeria do Projeto (Uma URL de imagem por linha)</label>
+                                <textarea name="gallery" defaultValue={editingItem?.gallery?.join('\n')} rows={5} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono text-xs" placeholder="https://...img1.jpg&#10;https://...img2.jpg" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Nome do Cliente</label>
+                                    <input name="client_name" defaultValue={editingItem?.client_name} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Depoimento Curto</label>
+                                    <input name="client_testimonial" defaultValue={editingItem?.client_testimonial} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                            </div>
+                        </div>
                     )}
                     {activeTab === 'testimonials' && (
                         <>
@@ -429,51 +523,104 @@ export default function CMSManager() {
               </button>
             </div>
 
-            <div className="grid gap-3">
-              {filteredNavigation.length === 0 && (
-                <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-3xl">
-                  <p className="text-gray-500 text-xs uppercase tracking-widest">Nenhum link cadastrado nesta seção.</p>
-                </div>
-              )}
-              {filteredNavigation.map((link) => (
-                <div key={link.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl group hover:border-white/10">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-white/5 flex flex-col items-center justify-center font-bold text-[10px] text-gray-500">
-                      <span className="text-[8px] opacity-40">ORD</span>
-                      {link.order}
-                    </div>
-                    <div>
-                      <h4 className="text-white font-bold text-sm flex items-center gap-2">
-                        {link.label}
-                        {!link.isActive && <span className="text-[8px] bg-red-500/20 text-red-500 px-1 rounded uppercase">Inativo</span>}
-                      </h4>
-                      <p className="text-[10px] text-gray-500 font-mono italic">{link.path}</p>
-                    </div>
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="navigation-list">
+                {(provided) => (
+                  <div 
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="grid gap-3"
+                  >
+                    {filteredNavigation.length === 0 && (
+                      <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-3xl">
+                        <p className="text-gray-500 text-xs uppercase tracking-widest">Nenhum link cadastrado nesta seção.</p>
+                      </div>
+                    )}
+                    {filteredNavigation.map((link, index) => {
+                      const dProps = {
+                        draggableId: String(link.id),
+                        index: index,
+                        key: String(link.id)
+                      };
+                      return (
+                        <Draggable {...(dProps as any)}>
+                          {(provided: any, snapshot: any) => (
+                            <div 
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={cn(
+                                "flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl group transition-all",
+                                snapshot.isDragging ? "bg-white/10 border-blue-500/50 shadow-2xl scale-[1.02] z-50" : "hover:border-white/10"
+                              )}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div 
+                                  {...provided.dragHandleProps}
+                                  className="p-2 text-gray-600 hover:text-white cursor-grab active:cursor-grabbing transition-colors"
+                                >
+                                  <GripVertical size={18} />
+                                </div>
+                                <div className="w-10 h-10 rounded-xl bg-white/5 flex flex-col items-center justify-center font-bold text-[10px] text-gray-500">
+                                  <span className="text-[8px] opacity-40">ORD</span>
+                                  {link.order}
+                                </div>
+                                <div>
+                                  <h4 className="text-white font-bold text-sm flex items-center gap-2">
+                                    {link.label}
+                                    {!link.isActive && <span className="text-[8px] bg-red-500/20 text-red-500 px-1 rounded uppercase">Inativo</span>}
+                                  </h4>
+                                  <p className="text-[10px] text-gray-500 font-mono italic">{link.path}</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => openEditModal(link)} className="p-2 text-gray-500 hover:text-white transition-all"><Edit3 size={16} /></button>
+                                <button onClick={() => handleDelete('navigation', link.id)} className="p-2 text-red-500/40 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
                   </div>
-                  <div className="flex gap-2">
-                    <button 
-                        onClick={async () => {
-                            const others = sortedNavigation.filter(n => n.type === link.type && n.order < link.order);
-                            if (others.length === 0) return;
-                            const prev = others[others.length - 1];
-                            await handleUpdate('navigation', { id: link.id, order: prev.order });
-                            await handleUpdate('navigation', { id: prev.id, order: link.order });
-                        }}
-                        className="p-2 text-gray-500 hover:text-white transition-all"
-                    >
-                        <Plus className="rotate-0" size={14} />
-                    </button>
-                    <button onClick={() => openEditModal(link)} className="p-2 text-gray-500 hover:text-white transition-all"><Edit3 size={16} /></button>
-                    <button onClick={() => handleDelete('navigation', link.id)} className="p-2 text-red-500/40 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-gray-500 italic text-center uppercase tracking-widest opacity-40">Dica: Use o campo 'Ordem' para definir a sequência de exibição.</p>
+                )}
+              </Droppable>
+            </DragDropContext>
+            <p className="text-[10px] text-gray-500 italic text-center uppercase tracking-widest opacity-40">Dica: Arraste os itens para reordenar a navegação.</p>
           </div>
         )}
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-2xl">
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Logo Oficial da Agência</label>
+              <div className="flex items-center gap-6 p-4 bg-white/[0.02] border border-white/10 rounded-2xl">
+                <div className="w-16 h-16 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
+                  {settings.agency_logo ? (
+                    <img src={settings.agency_logo} alt="Logo Preview" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded flex items-center justify-center font-bold text-white uppercase italic">
+                      {settings.agency_name?.charAt(0) || 'D'}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 flex gap-2">
+                  <input 
+                    type="text" 
+                    value={settings.agency_logo || ''} 
+                    onChange={e => setSettings({ ...settings, agency_logo: e.target.value })}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all font-medium text-xs"
+                    placeholder="URL da logo (PNG transparente recomendado)"
+                  />
+                  <button 
+                    onClick={() => setShowMediaPicker({ isOpen: true, targetField: 'agency_logo' })}
+                    className="px-4 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
+                  >
+                    <ImageIcon size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Nome da Agência</label>
@@ -534,6 +681,24 @@ export default function CMSManager() {
                   onChange={e => setSettings({ ...settings, seo_description: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">OG Image URL (SEO Image)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={settings.seo_image || ''} 
+                    onChange={e => setSettings({ ...settings, seo_image: e.target.value })}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
+                    placeholder="https://..."
+                  />
+                  <button 
+                    onClick={() => setShowMediaPicker({ isOpen: true, targetField: 'seo_image' })}
+                    className="px-4 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white"
+                  >
+                    <ImageIcon size={18} />
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Google Analytics ID</label>

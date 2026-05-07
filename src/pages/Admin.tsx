@@ -14,6 +14,8 @@ import {
   LineChart, Line 
 } from 'recharts';
 import CMSManager from './CMSManager';
+import ProjectAssetManager from '../components/ProjectAssetManager';
+import LeadNotifier from '../components/LeadNotifier';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { 
   collection, 
@@ -230,7 +232,7 @@ const ClientList = ({ clients, onEdit, onAdd }: { clients: any[], onEdit: (c: an
   </div>
 );
 
-const ProjectList = ({ projects, onEdit, onAdd }: { projects: any[], onEdit: (p: any) => void, onAdd: () => void }) => (
+const ProjectList = ({ projects, onEdit, onAdd, onManageAssets }: { projects: any[], onEdit: (p: any) => void, onAdd: () => void, onManageAssets: (p: any) => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
     <TableHeader title="Projetos" results={projects.length} onAdd={onAdd} />
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -251,7 +253,20 @@ const ProjectList = ({ projects, onEdit, onAdd }: { projects: any[], onEdit: (p:
           <p className="text-white/60 text-sm mb-6 line-clamp-2 h-10">{project.description}</p>
           <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-xs text-white/40">
             <span>Criado em {formatDate(project.createdAt || project.created_at)}</span>
-            <button onClick={() => onEdit(project)} className="text-blue-500 font-bold uppercase tracking-widest text-[10px] hover:text-white transition-all">Editar</button>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => onEdit(project)} 
+                className="text-blue-500 font-bold uppercase tracking-widest text-[10px] hover:text-white transition-all"
+              >
+                Editar
+              </button>
+              <button 
+                onClick={() => onManageAssets?.(project)} 
+                className="text-white/40 font-bold uppercase tracking-widest text-[10px] hover:text-blue-400 transition-all"
+              >
+                Arquivos
+              </button>
+            </div>
           </div>
         </div>
       ))}
@@ -388,6 +403,7 @@ export default function Admin() {
   const { data: billing, loading: billingLoading } = useFirestoreCollection<any>('billing');
 
   const [modalType, setModalType] = useState<'client' | 'project' | 'invoice' | null>(null);
+  const [assetProject, setAssetProject] = useState<any>(null);
   const [editingData, setEditingData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -475,9 +491,23 @@ export default function Admin() {
           <Route path="cms" element={<CMSManager />} />
           <Route path="mensagens" element={<MessageList />} />
           <Route path="clientes" element={<ClientList clients={clients} onAdd={() => setModalType('client')} onEdit={(c) => { setEditingData(c); setModalType('client'); }} />} />
-          <Route path="projetos" element={<ProjectList projects={projects} onAdd={() => setModalType('project')} onEdit={(p) => { setEditingData(p); setModalType('project'); }} />} />
+          <Route path="projetos" element={<ProjectList projects={projects} onAdd={() => setModalType('project')} onEdit={(p) => { setEditingData(p); setModalType('project'); }} onManageAssets={(p) => setAssetProject(p)} />} />
           <Route path="financeiro" element={<BillingList billing={billing} onAdd={() => setModalType('invoice')} onEdit={(b) => { setEditingData(b); setModalType('invoice'); }} />} />
         </Routes>
+
+        <LeadNotifier />
+
+        {assetProject && (
+          <ProjectAssetManager 
+            project={assetProject} 
+            onClose={() => setAssetProject(null)} 
+            onUpdate={async () => {
+              // The useFirestoreCollection hook will auto-update or we can force it if needed
+              // But for now, we just close and set null to refresh data if we fetch properly
+              setAssetProject({ ...assetProject }); // Simple trick to force re-render if needed
+            }} 
+          />
+        )}
       </div>
     </div>
   );

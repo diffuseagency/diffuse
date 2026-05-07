@@ -1,27 +1,16 @@
 import { Link } from 'react-router-dom';
 import { Mail, Github, Linkedin, Instagram } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useSiteSettings } from '../lib/useSiteSettings';
 
 export default function Footer() {
-  const [settings, setSettings] = useState<any>({});
+  const { settings } = useSiteSettings();
   const [navLinks, setNavLinks] = useState<any[]>([]);
   const [legalLinks, setLegalLinks] = useState<any[]>([]);
   
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'settings'));
-        const sData: any = {};
-        querySnapshot.docs.forEach(d => sData[d.data().key] = d.data().value);
-        setSettings(sData);
-      } catch (err) {
-        console.error('Error loading footer settings:', err);
-      }
-    };
-    fetchSettings();
-
     const unsubNav = onSnapshot(collection(db, 'navigation'), (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
       setNavLinks(items.filter(i => i.type === 'footer' && i.isActive !== false).sort((a, b) => a.order - b.order));
@@ -35,11 +24,19 @@ export default function Footer() {
     <footer className="bg-black pt-40 pb-20 border-t border-white/5 selection:bg-white selection:text-black">
       <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between gap-20">
         <div className="max-w-md">
-          <Link to="/" className="flex items-center space-x-2 mb-8">
-            <div className="w-8 h-8 bg-white flex items-center justify-center rounded-sm rotate-45">
-              <span className="text-black font-bold text-lg -rotate-45">D</span>
-            </div>
-            <span className="text-white font-display text-xl tracking-tighter uppercase font-light">Diffuse</span>
+          <Link to="/" className="flex items-center space-x-2 mb-8 group">
+            {settings.agency_logo ? (
+              <img 
+                src={settings.agency_logo} 
+                alt="Diffuse Logo" 
+                className="h-8 w-auto object-contain transition-transform group-hover:scale-105" 
+              />
+            ) : (
+              <div className="w-8 h-8 bg-white flex items-center justify-center rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500">
+                <span className="text-black font-bold text-lg -rotate-45 group-hover:-rotate-90 transition-transform duration-500">D</span>
+              </div>
+            )}
+            <span className="text-white font-display text-xl tracking-tighter uppercase font-light ml-2">Diffuse</span>
           </Link>
           <p className="text-4xl font-display font-light mb-12 tracking-tight leading-tight text-white/90">
             {settings?.footer_text || 'Arquitetamos experiências digitais que definem a excelência.'}

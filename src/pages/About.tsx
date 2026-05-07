@@ -1,28 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
+import SEO from '../components/SEO';
 import { ShieldCheck, Eye, Target, Users2, Loader2 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useSiteSettings } from '../lib/useSiteSettings';
 
 export default function About() {
-  const [settings, setSettings] = useState<any>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'settings'));
-        const sData: any = {};
-        snap.docs.forEach(d => sData[d.data().key] = d.data().value);
-        setSettings(sData);
-      } catch (e) {
-        console.error("Error fetching settings:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSettings();
-  }, []);
+  const { settings, loading } = useSiteSettings();
 
   if (loading) {
     return (
@@ -43,6 +26,7 @@ export default function About() {
 
   return (
     <div className="pt-40 pb-20 px-4 max-w-7xl mx-auto">
+      <SEO title={`Sobre | ${settings.agency_name || 'Diffuse'}`} />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

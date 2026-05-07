@@ -1,12 +1,12 @@
 import { motion } from 'motion/react';
 import { Mail, Phone, MapPin, Send, Instagram, Linkedin, Github } from 'lucide-react';
+import SEO from '../components/SEO';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState, useEffect } from 'react';
-import { getDocs, collection } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useState } from 'react';
 import { addFirestoreDoc } from '../lib/cmsHooks';
+import { useSiteSettings } from '../lib/useSiteSettings';
 
 const contactSchema = z.object({
   name: z.string().min(2, 'Nome muito curto'),
@@ -21,23 +21,7 @@ export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
-  const [settings, setSettings] = useState<any>({});
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'settings'));
-        const settingsData: any = {};
-        querySnapshot.forEach(doc => {
-          settingsData[doc.data().key] = doc.data().value;
-        });
-        setSettings(settingsData);
-      } catch (err) {
-        console.error('Error fetching settings:', err);
-      }
-    };
-    fetchSettings();
-  }, []);
+  const { settings } = useSiteSettings();
   
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
@@ -61,6 +45,7 @@ export default function Contact() {
 
   return (
     <div className="pt-40 max-w-7xl mx-auto px-4 pb-20">
+      <SEO title={`Contato | ${settings.agency_name || 'Diffuse'}`} />
       <div className="grid lg:grid-cols-2 gap-24">
         <div>
           <motion.div

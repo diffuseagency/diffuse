@@ -32,12 +32,19 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
+        "slug": { "type": "string" },
         "category": { "type": "string" },
         "image": { "type": "string" },
         "year": { "type": "string" },
+        "full_description": { "type": "string" },
+        "challenge_text": { "type": "string" },
+        "solution_text": { "type": "string" },
+        "gallery": { "type": "array", "items": { "type": "string" } },
+        "client_name": { "type": "string" },
+        "client_testimonial": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["title"]
+      "required": ["title", "slug"]
     },
     "SiteSetting": {
       "title": "Site Setting",
@@ -94,10 +101,28 @@
       "type": "object",
       "properties": {
         "clientId": { "type": "string" },
+        "client_name": { "type": "string" },
+        "client_email": { "type": "string", "format": "email" },
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"] },
+        "status": { "type": "string", "enum": ["active", "completed", "on-hold", "discovery"] },
         "budget": { "type": "number" },
+        "deadline": { "type": "string", "format": "date" },
+        "current_step": { "type": "number" },
+        "assets": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "size": { "type": "number" },
+              "type": { "type": "string" },
+              "uploadedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["clientId", "title"]
@@ -107,13 +132,27 @@
       "description": "Invoice or payment record.",
       "type": "object",
       "properties": {
-        "projectId": { "type": "string" },
+        "project_id": { "type": "string" },
         "amount": { "type": "number" },
         "status": { "type": "string", "enum": ["paid", "unpaid"] },
         "dueDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["projectId", "amount"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Contact form submissions.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "read", "replied"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "message"]
     }
   },
   "firestore": {
@@ -152,6 +191,10 @@
     "billing": {
       "schema": "Billing",
       "description": "Internal billing records."
+    },
+    "messages": {
+      "schema": "Message",
+      "description": "Inbound leads."
     }
   }
 }
