@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "Client feedback and results.",
+      "type": "object",
+      "properties": {
+        "author": { "type": "string" },
+        "role": { "type": "string" },
+        "content": { "type": "string" },
+        "rating": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["author", "content"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Offered services by the agency.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "Showcase of past work.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "year": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title"]
+    },
+    "SiteSetting": {
+      "title": "Site Setting",
+      "description": "Key-value pair for site content.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["key", "value"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Business client information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "company": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Client project details.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"] },
+        "budget": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "title"]
+    },
+    "Billing": {
+      "title": "Billing",
+      "description": "Invoice or payment record.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["paid", "unpaid"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "amount"]
+    }
+  },
+  "firestore": {
+    "testimonials": {
+      "schema": "Testimonial",
+      "description": "Public testimonials."
+    },
+    "services": {
+      "schema": "Service",
+      "description": "Services offered."
+    },
+    "portfolio": {
+      "schema": "PortfolioItem",
+      "description": "Portfolio work."
+    },
+    "settings": {
+      "schema": "SiteSetting",
+      "description": "General site settings."
+    },
+    "clients": {
+      "schema": "Client",
+      "description": "Internal client list."
+    },
+    "projects": {
+      "schema": "Project",
+      "description": "Internal projects."
+    },
+    "billing": {
+      "schema": "Billing",
+      "description": "Internal billing records."
+    }
+  }
+}

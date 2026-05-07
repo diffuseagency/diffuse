@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ---------------------------------------------------------
+    // GLOBAL HELPERS
+    // ---------------------------------------------------------
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'diffuseagency@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ---------------------------------------------------------
+    // VALIDATION HELPERS
+    // ---------------------------------------------------------
+    
+    function isValidPortfolio(data) {
+      return data.keys().hasAll(['title']) &&
+             data.title is string && data.title.size() <= 200 &&
+             (data.get('category', '') is string) &&
+             (data.get('image', '') is string) &&
+             (data.get('year', '') is string) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['title']) &&
+             data.title is string && data.title.size() <= 200 &&
+             (data.get('description', '') is string) &&
+             (data.get('icon', '') is string) &&
+             (data.get('features', []) is list) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    function isValidTestimonial(data) {
+      return data.keys().hasAll(['author', 'content']) &&
+             data.author is string && data.author.size() <= 100 &&
+             data.content is string && data.content.size() <= 1000 &&
+             (data.get('role', '') is string) &&
+             (data.get('rating', 5) is int) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    function isValidSetting(data) {
+      return data.keys().hasAll(['key', 'value']) &&
+             data.key is string && data.key.size() <= 100 &&
+             data.value is string && data.value.size() <= 5000;
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['name', 'email']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             (data.get('company', '') is string) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['clientId', 'title']) &&
+             data.clientId is string && isValidId(data.clientId) &&
+             data.title is string && data.title.size() <= 200 &&
+             exists(/databases/$(database)/documents/clients/$(data.clientId)) &&
+             (data.get('status', 'pending') in ['pending', 'in_progress', 'completed', 'cancelled']) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    function isValidBilling(data) {
+      return data.keys().hasAll(['projectId', 'amount']) &&
+             data.projectId is string && isValidId(data.projectId) &&
+             data.amount is number &&
+             exists(/databases/$(database)/documents/projects/$(data.projectId)) &&
+             (data.get('status', 'unpaid') in ['paid', 'unpaid']) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['name', 'email', 'message']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.message is string && data.message.size() <= 2000 &&
+             (data.get('subject', '') is string) &&
+             (data.get('read', false) is bool) &&
+             (data.get('createdAt', request.time) == request.time);
+    }
+
+    // ---------------------------------------------------------
+    // ROUTES
+    // ---------------------------------------------------------
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && request.auth.uid == adminId;
+      allow write: if false; // Only manageable via console or service account
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAdmin();
+      allow create: if isValidMessage(incoming()) && isValidId(messageId);
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['read']) ||
+        isValidMessage(incoming())
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /portfolio/{itemId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidPortfolio(incoming()) && isValidId(itemId);
+      allow update: if isAdmin() && isValidPortfolio(incoming()) &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidService(incoming()) && isValidId(serviceId);
+      allow update: if isAdmin() && isValidService(incoming()) &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /testimonials/{testId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidTestimonial(incoming()) && isValidId(testId);
+      allow update: if isAdmin() && isValidTestimonial(incoming()) &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidSetting(incoming()) && isValidId(settingId);
+      allow update: if isAdmin() && isValidSetting(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /clients/{clientId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidClient(incoming()) && isValidId(clientId);
+      allow update: if isAdmin() && isValidClient(incoming()) &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidProject(incoming()) && isValidId(projectId);
+      allow update: if isAdmin() && isValidProject(incoming()) &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /billing/{billId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidBilling(incoming()) && isValidId(billId);
+      allow update: if isAdmin() && isValidBilling(incoming()) &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
