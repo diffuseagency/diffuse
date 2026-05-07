@@ -150,9 +150,12 @@ export default function Profile() {
                                         </div>
                                     </div>
                                 </div>
-                                <button className="p-3 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all">
+                                <Link 
+                                    to={`/project/${project.id}`}
+                                    className="p-3 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all hover:bg-blue-500/20"
+                                >
                                     <ChevronRight size={18} />
-                                </button>
+                                </Link>
                             </div>
                         ))}
                     </div>

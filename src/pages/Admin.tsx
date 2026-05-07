@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   LayoutDashboard, Users, Briefcase, 
   CreditCard, Search, User,
   Plus, Bell, LogOut, TrendingUp,
-  Clock, Edit, MessageSquare, Trash2, Mail
+  Clock, Edit, MessageSquare, Trash2, Mail,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, 
@@ -17,10 +18,12 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { 
   collection, 
   getDocs, 
-  orderBy 
+  orderBy,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { useFirestoreCollection, deleteFirestoreDoc, updateFirestoreDoc } from '../lib/cmsHooks';
+import { useFirestoreCollection, deleteFirestoreDoc, updateFirestoreDoc, addFirestoreDoc } from '../lib/cmsHooks';
+import { Modal, ClientForm, ProjectForm, InvoiceForm } from '../components/OperationalModals';
 
 // --- Components ---
 
@@ -151,7 +154,7 @@ const Dashboard = ({ metrics }: { metrics: any }) => {
   );
 };
 
-const TableHeader = ({ title, results }: { title: string, results: number }) => (
+const TableHeader = ({ title, results, onAdd }: { title: string, results: number, onAdd?: () => void }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
     <div>
       <h2 className="text-2xl font-medium">{title}</h2>
@@ -166,9 +169,11 @@ const TableHeader = ({ title, results }: { title: string, results: number }) => 
           className="w-full bg-zinc-900 border border-white/5 rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-white/20 transition-all"
         />
       </div>
-      <button className="bg-white text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-white/90">
-        <Plus size={18} /> Novo
-      </button>
+      {onAdd && (
+        <button onClick={onAdd} className="bg-white text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-white/90">
+          <Plus size={18} /> Novo
+        </button>
+      )}
     </div>
   </div>
 );
@@ -181,9 +186,9 @@ const formatDate = (val: any) => {
   return new Date(val).toLocaleDateString();
 };
 
-const ClientList = ({ clients }: { clients: any[] }) => (
+const ClientList = ({ clients, onEdit, onAdd }: { clients: any[], onEdit: (c: any) => void, onAdd: () => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
-    <TableHeader title="Gerenciamento de Clientes" results={clients.length} />
+    <TableHeader title="Gerenciamento de Clientes" results={clients.length} onAdd={onAdd} />
     <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
       <table className="w-full text-left">
         <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
@@ -200,7 +205,7 @@ const ClientList = ({ clients }: { clients: any[] }) => (
             <tr key={client.id} className="hover:bg-white/5 transition-all group">
               <td className="px-6 py-4">
                 <div className="flex flex-col">
-                  <span className="font-medium">{client.name}</span>
+                  <span className="font-medium text-white">{client.name}</span>
                   <span className="text-xs text-white/40">{client.company}</span>
                 </div>
               </td>
@@ -210,7 +215,12 @@ const ClientList = ({ clients }: { clients: any[] }) => (
               </td>
               <td className="px-6 py-4 text-sm text-white/40">{formatDate(client.createdAt || client.created_at)}</td>
               <td className="px-6 py-4 text-right">
-                <button className="text-white/20 hover:text-white transition-all text-xs border border-white/10 px-3 py-1 rounded">Editar</button>
+                <button 
+                  onClick={() => onEdit(client)}
+                  className="text-white/20 hover:text-white transition-all text-xs border border-white/10 px-3 py-1 rounded"
+                >
+                  Editar
+                </button>
               </td>
             </tr>
           ))}
@@ -220,26 +230,28 @@ const ClientList = ({ clients }: { clients: any[] }) => (
   </div>
 );
 
-const ProjectList = ({ projects }: { projects: any[] }) => (
+const ProjectList = ({ projects, onEdit, onAdd }: { projects: any[], onEdit: (p: any) => void, onAdd: () => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
-    <TableHeader title="Projetos" results={projects.length} />
+    <TableHeader title="Projetos" results={projects.length} onAdd={onAdd} />
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
       {projects.map((project) => (
-        <div key={project.id} className="bg-zinc-900 border border-white/5 p-6 rounded-2xl hover:border-white/20 transition-all">
+        <div key={project.id} className="bg-zinc-900 border border-white/5 p-6 rounded-2xl hover:border-white/20 transition-all flex flex-col">
           <div className="flex justify-between items-start mb-4">
             <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold border ${
-              project.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+              project.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
+              project.status === 'active' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+              'bg-amber-500/10 text-amber-500 border-amber-500/20'
             }`}>
-              {project.status === 'completed' ? 'Concluído' : 'Em Andamento'}
+              {project.status === 'completed' ? 'Concluído' : project.status === 'active' ? 'Em Andamento' : 'Discovery'}
             </span>
-            <span className="text-xl font-bold tracking-tighter">R$ {project.budget?.toLocaleString() || 0}</span>
+            <span className="text-xl font-bold tracking-tighter text-white">R$ {project.budget?.toLocaleString() || 0}</span>
           </div>
-          <h3 className="text-lg font-medium mb-1">{project.title}</h3>
-          <p className="text-white/40 text-xs mb-4 uppercase font-mono">{project.client_name}</p>
+          <h3 className="text-lg font-medium mb-1 text-white">{project.title}</h3>
+          <p className="text-white/40 text-[10px] mb-4 uppercase font-bold tracking-widest">{project.client_name}</p>
           <p className="text-white/60 text-sm mb-6 line-clamp-2 h-10">{project.description}</p>
-          <div className="pt-4 border-t border-white/5 flex justify-between items-center text-xs text-white/40">
+          <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-xs text-white/40">
             <span>Criado em {formatDate(project.createdAt || project.created_at)}</span>
-            <button className="text-white hover:underline">Detalhes</button>
+            <button onClick={() => onEdit(project)} className="text-blue-500 font-bold uppercase tracking-widest text-[10px] hover:text-white transition-all">Editar</button>
           </div>
         </div>
       ))}
@@ -247,9 +259,9 @@ const ProjectList = ({ projects }: { projects: any[] }) => (
   </div>
 );
 
-const BillingList = ({ billing }: { billing: any[] }) => (
+const BillingList = ({ billing, onEdit, onAdd }: { billing: any[], onEdit: (b: any) => void, onAdd: () => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
-    <TableHeader title="Faturamento & Cobrança" results={billing.length} />
+    <TableHeader title="Faturamento & Cobrança" results={billing.length} onAdd={onAdd} />
     <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
       <table className="w-full text-left">
         <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
@@ -264,8 +276,8 @@ const BillingList = ({ billing }: { billing: any[] }) => (
         <tbody className="divide-y divide-white/5">
           {billing.map((bill) => (
             <tr key={bill.id} className="hover:bg-white/5 transition-all">
-              <td className="px-6 py-4 text-sm font-medium">{bill.project_title}</td>
-              <td className="px-6 py-4 text-sm font-bold">R$ {bill.amount.toLocaleString()}</td>
+              <td className="px-6 py-4 text-sm font-medium text-white">{bill.project_title}</td>
+              <td className="px-6 py-4 text-sm font-bold text-white">R$ {bill.amount.toLocaleString()}</td>
               <td className="px-6 py-4 text-sm text-white/40">{new Date(bill.due_date).toLocaleDateString()}</td>
               <td className="px-6 py-4">
                <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold border ${
@@ -275,8 +287,11 @@ const BillingList = ({ billing }: { billing: any[] }) => (
                 </span>
               </td>
               <td className="px-6 py-4 text-right">
-                <button className="text-white/60 hover:text-white transition-all rounded p-2">
-                  Ver Fatura
+                <button 
+                  onClick={() => onEdit(bill)}
+                  className="text-white/60 hover:text-white transition-all rounded p-2 text-xs uppercase font-bold tracking-widest"
+                >
+                  Editar
                 </button>
               </td>
             </tr>
@@ -368,9 +383,13 @@ const MessageList = () => {
 // --- Main Admin Wrapper ---
 
 export default function Admin() {
-  const { data: clients } = useFirestoreCollection<any>('clients');
-  const { data: projects } = useFirestoreCollection<any>('projects');
-  const { data: billing } = useFirestoreCollection<any>('billing');
+  const { data: clients, loading: clientsLoading } = useFirestoreCollection<any>('clients');
+  const { data: projects, loading: projectsLoading } = useFirestoreCollection<any>('projects');
+  const { data: billing, loading: billingLoading } = useFirestoreCollection<any>('billing');
+
+  const [modalType, setModalType] = useState<'client' | 'project' | 'invoice' | null>(null);
+  const [editingData, setEditingData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const metrics = useMemo(() => {
     const paid = billing.filter(b => b.status === 'paid').reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
@@ -391,6 +410,24 @@ export default function Admin() {
       chartData
     };
   }, [clients, projects, billing]);
+
+  const handleSubmit = async (data: any) => {
+    setLoading(true);
+    try {
+        const collectionName = modalType === 'client' ? 'clients' : modalType === 'project' ? 'projects' : 'billing';
+        if (editingData?.id) {
+            await updateFirestoreDoc(collectionName, editingData.id, { ...data, updatedAt: serverTimestamp() });
+        } else {
+            await addFirestoreDoc(collectionName, { ...data, createdAt: serverTimestamp() });
+        }
+        setModalType(null);
+        setEditingData(null);
+    } catch (error) {
+        console.error("Error saving data:", error);
+    } finally {
+        setLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-brand-bg text-gray-300 relative overflow-hidden">
@@ -422,13 +459,24 @@ export default function Admin() {
           </div>
         </header>
 
+        {/* Modals */}
+        <Modal 
+            isOpen={!!modalType} 
+            onClose={() => { setModalType(null); setEditingData(null); }} 
+            title={editingData ? `Editar ${modalType}` : `Novo ${modalType}`}
+        >
+            {modalType === 'client' && <ClientForm initialData={editingData} onSubmit={handleSubmit} loading={loading} />}
+            {modalType === 'project' && <ProjectForm initialData={editingData} clients={clients} onSubmit={handleSubmit} loading={loading} />}
+            {modalType === 'invoice' && <InvoiceForm initialData={editingData} projects={projects} onSubmit={handleSubmit} loading={loading} />}
+        </Modal>
+
         <Routes>
           <Route index element={<Dashboard metrics={metrics} />} />
           <Route path="cms" element={<CMSManager />} />
           <Route path="mensagens" element={<MessageList />} />
-          <Route path="clientes" element={<ClientList clients={clients} />} />
-          <Route path="projetos" element={<ProjectList projects={projects} />} />
-          <Route path="financeiro" element={<BillingList billing={billing} />} />
+          <Route path="clientes" element={<ClientList clients={clients} onAdd={() => setModalType('client')} onEdit={(c) => { setEditingData(c); setModalType('client'); }} />} />
+          <Route path="projetos" element={<ProjectList projects={projects} onAdd={() => setModalType('project')} onEdit={(p) => { setEditingData(p); setModalType('project'); }} />} />
+          <Route path="financeiro" element={<BillingList billing={billing} onAdd={() => setModalType('invoice')} onEdit={(b) => { setEditingData(b); setModalType('invoice'); }} />} />
         </Routes>
       </div>
     </div>

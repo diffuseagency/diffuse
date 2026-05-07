@@ -41,13 +41,40 @@
     },
     "SiteSetting": {
       "title": "Site Setting",
-      "description": "Key-value pair for site content.",
+      "description": "Key-value pair for site content. Common keys: about_manifesto, about_vision, about_mission, about_dna, seo_title, seo_description, analytics_id.",
       "type": "object",
       "properties": {
         "key": { "type": "string" },
         "value": { "type": "string" }
       },
       "required": ["key", "value"]
+    },
+    "NavigationLink": {
+      "title": "Navigation Link",
+      "description": "Links for Navbar or Footer.",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "path": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["header", "footer", "legal"] }
+      },
+      "required": ["label", "path", "order", "type"]
+    },
+    "MediaAsset": {
+      "title": "Media Asset",
+      "description": "Metadata for uploaded files.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "type": { "type": "string" },
+        "size": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "uploadedBy": { "type": "string" }
+      },
+      "required": ["name", "url", "type", "size", "createdAt", "uploadedBy"]
     },
     "Client": {
       "title": "Client",
@@ -101,6 +128,14 @@
     "portfolio": {
       "schema": "PortfolioItem",
       "description": "Portfolio work."
+    },
+    "navigation": {
+      "schema": "NavigationLink",
+      "description": "Site navigation links."
+    },
+    "media": {
+      "schema": "MediaAsset",
+      "description": "Uploaded media library."
     },
     "settings": {
       "schema": "SiteSetting",

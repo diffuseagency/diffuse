@@ -66,7 +66,25 @@ service cloud.firestore {
     function isValidSetting(data) {
       return data.keys().hasAll(['key', 'value']) &&
              data.key is string && data.key.size() <= 100 &&
-             data.value is string && data.value.size() <= 5000;
+             data.value is string && data.value.size() <= 10000;
+    }
+
+    function isValidNavigationLink(data) {
+      return data.keys().hasAll(['label', 'path', 'order', 'type']) &&
+             data.label is string && data.label.size() <= 50 &&
+             data.path is string && data.path.size() <= 100 &&
+             data.order is int &&
+             data.type in ['header', 'footer', 'legal'] &&
+             (data.get('isActive', true) is bool);
+    }
+
+    function isValidMediaAsset(data) {
+      return data.keys().hasAll(['name', 'url', 'type', 'size', 'createdAt', 'uploadedBy']) &&
+             data.name is string && data.name.size() <= 255 &&
+             data.url is string && data.url.size() <= 1000 &&
+             data.type is string &&
+             data.size is int &&
+             data.uploadedBy == request.auth.uid;
     }
 
     function isValidClient(data) {
@@ -157,6 +175,20 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAdmin() && isValidSetting(incoming()) && isValidId(settingId);
       allow update: if isAdmin() && isValidSetting(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /navigation/{linkId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidNavigationLink(incoming()) && isValidId(linkId);
+      allow update: if isAdmin() && isValidNavigationLink(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /media/{assetId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidMediaAsset(incoming()) && isValidId(assetId);
+      allow update: if false; // Assets are immutable
       allow delete: if isAdmin();
     }
 

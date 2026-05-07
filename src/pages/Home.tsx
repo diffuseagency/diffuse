@@ -17,8 +17,8 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const FeatureCard = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
-  <div className="glass-card p-8 group hover:bg-white/10 transition-all">
+const FeatureCard = ({ icon: Icon, title, description, ...props }: { icon: any, title: string, description: string, [key: string]: any }) => (
+  <div className="glass-card p-8 group hover:bg-white/10 transition-all" {...props}>
     <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center mb-6 border border-white/10 group-hover:bg-white group-hover:text-black transition-all">
       <Icon size={24} />
     </div>

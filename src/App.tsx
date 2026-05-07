@@ -18,26 +18,68 @@ import Portfolio from './pages/Portfolio';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
+import ProjectDetails from './pages/ProjectDetails';
 import AdminGuard from './components/AdminGuard';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 
+import { HelmetProvider, Helmet } from 'react-helmet-async';
+import { SiteSettingsProvider, useSiteSettings } from './lib/useSiteSettings';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
+
+function SEO() {
+  const { settings } = useSiteSettings();
+  const defaultTitle = "Diffuse Agency | Elite Web Engineering";
+  const defaultDesc = "Transformando visão em realidade digital através de engenharia sênior e design de alta fidelidade.";
+  
+  return (
+    <Helmet>
+      <title>{settings.seo_title || defaultTitle}</title>
+      <meta name="description" content={settings.seo_description || defaultDesc} />
+      <meta property="og:title" content={settings.seo_title || defaultTitle} />
+      <meta property="og:description" content={settings.seo_description || defaultDesc} />
+      {settings.analytics_id && (
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${settings.analytics_id}`}></script>
+      )}
+    </Helmet>
+  );
+}
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [navLinks, setNavLinks] = useState<any[]>([]);
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith('/admin');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    // Basic real-time sync for nav
+    const unsubscribeNav = onSnapshot(collection(db, 'navigation'), (snap) => {
+      const links = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((l: any) => l.isActive !== false && l.type === 'header')
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+      
+      if (links.length > 0) {
+        setNavLinks(links);
+      } else {
+        // Fallback static links if none in DB
+        setNavLinks([
+          { label: 'Home', path: '/' },
+          { label: 'Sobre', path: '/sobre' },
+          { label: 'Serviços', path: '/servicos' },
+          { label: 'Portfólio', path: '/portfolio' },
+          { label: 'Contato', path: '/contato' },
+        ]);
+      }
+    });
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Check if user is in admins collection
         try {
           const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
           setIsUserAdmin(adminDoc.exists());
@@ -49,18 +91,13 @@ const Navbar = () => {
         setIsUserAdmin(false);
       }
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribeNav();
+      unsubscribeAuth();
+    };
   }, []);
 
   if (isAdminPage) return null;
-
-  const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'Sobre', path: '/sobre' },
-    { name: 'Serviços', path: '/servicos' },
-    { name: 'Portfólio', path: '/portfolio' },
-    { name: 'Contato', path: '/contato' },
-  ];
 
   return (
     <nav className="fixed w-full z-50 bg-white/5 backdrop-blur-md border-b border-white/10">
@@ -79,14 +116,14 @@ const Navbar = () => {
               const isActive = location.pathname === link.path;
               return (
                 <Link
-                  key={link.name}
+                  key={link.id || link.label}
                   to={link.path}
                   className={cn(
                     "hover:text-white transition-colors uppercase",
                     isActive ? "text-white border-b border-blue-500 pb-1" : "text-gray-400"
                   )}
                 >
-                  {link.name}
+                  {link.label || link.name}
                 </Link>
               );
             })}
@@ -147,12 +184,12 @@ const Navbar = () => {
             <div className="px-4 pt-2 pb-6 space-y-4">
               {navLinks.map((link) => (
                 <Link
-                  key={link.name}
+                  key={link.id || link.label}
                   to={link.path}
                   onClick={() => setIsOpen(false)}
                   className="block text-white/80 hover:text-white text-lg font-light tracking-wide py-2"
                 >
-                  {link.name}
+                  {link.label || link.name}
                 </Link>
               ))}
               {user ? (
@@ -199,14 +236,15 @@ const Navbar = () => {
 };
 
 export default function App() {
-  const [pathname, setPathname] = useState(window.location.pathname);
-
-  // We need to use useLocation but App is the Router wrapper.
-  // Actually, I'll create a Layout component inside Router to handle this.
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <HelmetProvider>
+      <SiteSettingsProvider>
+        <Router>
+          <SEO />
+          <AppContent />
+        </Router>
+      </SiteSettingsProvider>
+    </HelmetProvider>
   );
 }
 
@@ -235,6 +273,7 @@ function AppContent() {
             <Route path="/contato" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/project/:id" element={<ProjectDetails />} />
             <Route path="/admin/*" element={
               <AdminGuard>
                 <Admin />

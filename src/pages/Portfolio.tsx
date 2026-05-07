@@ -3,17 +3,33 @@ import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function Portfolio() {
   const [projects, setProjects] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [activeFilter, setActiveFilter] = useState('Tudo');
 
   useEffect(() => {
     const fetchPortfolio = async () => {
       const snap = await getDocs(collection(db, 'portfolio'));
-      setProjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setProjects(items);
+      
+      const cats = Array.from(new Set(items.map((p: any) => p.category))).filter(Boolean) as string[];
+      setCategories(cats);
     };
     fetchPortfolio();
   }, []);
+
+  const filteredProjects = activeFilter === 'Tudo' 
+    ? projects 
+    : projects.filter(p => p.category === activeFilter);
 
   return (
     <div className="pt-40 max-w-7xl mx-auto px-4">
@@ -25,16 +41,33 @@ export default function Portfolio() {
             Uma seleção curada de projetos onde o design sophisticação encontra a excelência técnica.
           </p>
         </div>
-        <div className="flex gap-4">
-          <span className="text-white font-mono text-sm underline underline-offset-8 transition-all cursor-pointer">Tudo</span>
-          <span className="text-white/40 font-mono text-sm hover:text-white transition-all cursor-pointer">Web</span>
-          <span className="text-white/40 font-mono text-sm hover:text-white transition-all cursor-pointer">Mobile</span>
-          <span className="text-white/40 font-mono text-sm hover:text-white transition-all cursor-pointer">Design</span>
+        <div className="flex gap-6 overflow-x-auto pb-4 md:pb-0 w-full md:w-auto">
+          <button 
+            onClick={() => setActiveFilter('Tudo')}
+            className={cn(
+              "font-mono text-sm transition-all cursor-pointer whitespace-nowrap",
+              activeFilter === 'Tudo' ? "text-white underline underline-offset-8" : "text-white/40 hover:text-white"
+            )}
+          >
+            Tudo
+          </button>
+          {categories.map(cat => (
+            <button 
+              key={cat}
+              onClick={() => setActiveFilter(cat)}
+              className={cn(
+                "font-mono text-sm transition-all cursor-pointer whitespace-nowrap",
+                activeFilter === cat ? "text-white underline underline-offset-8" : "text-white/40 hover:text-white"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-24 mb-40">
-        {projects.map((p, i) => (
+        {filteredProjects.map((p, i) => (
           <motion.div
             key={p.id}
             initial={{ opacity: 0, y: 30 }}

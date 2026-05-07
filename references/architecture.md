@@ -48,7 +48,7 @@ O DIFFUSE é um ecossistema digital de alta performance que combina um **CMS (Co
 A base de dados é relacional e normalizada:
 - `site_settings`: Armazenamento chave-valor para textos dinâmicos do site.
 - `portfolio`, `services`, `testimonials`: Tabelas para o CMS.
-- `clients`, `projects`, `billing`: Gestão interna exibida no Dashboard Admin.
+
 
 ## 5. Integração Firebase
 O sistema utiliza Firebase como espinha dorsal de dados e segurança:

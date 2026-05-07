@@ -1,7 +1,46 @@
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Eye, Target, Users2 } from 'lucide-react';
+import { ShieldCheck, Eye, Target, Users2, Loader2 } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export default function About() {
+  const [settings, setSettings] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'settings'));
+        const sData: any = {};
+        snap.docs.forEach(d => sData[d.data().key] = d.data().value);
+        setSettings(sData);
+      } catch (e) {
+        console.error("Error fetching settings:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="text-blue-500">
+          <Loader2 size={40} />
+        </motion.div>
+      </div>
+    );
+  }
+
+  const content = {
+    manifesto: settings.about_manifesto || "A Diffuse nasceu da necessidade de elevar o padrão do desenvolvimento web. Não apenas construímos sites; arquitetamos experiências que definem o futuro digital de nossos parceiros.",
+    vision: settings.about_vision || "Ser a referência global em soluções digitais que harmonizam sofisticação artística e robustez técnica.",
+    mission: settings.about_mission || "Transformar desafios complexos em soluções intuitivas e encantadoras através de engenharia sênior.",
+    dna: settings.about_dna || "Fusão entre design editorial, performance absoluta e tecnologia de processamento em tempo real."
+  };
+
   return (
     <div className="pt-40 pb-20 px-4 max-w-7xl mx-auto">
       <motion.div
@@ -14,7 +53,7 @@ export default function About() {
           Excelência como <br /> ponto de partida.
         </h1>
         <p className="text-2xl text-white/60 font-light leading-relaxed">
-          A Diffuse nasceu da necessidade de elevar o padrão do desenvolvimento web. Não apenas construímos sites; arquitetamos experiências que definem o futuro digital de nossos parceiros.
+          {content.manifesto}
         </p>
       </motion.div>
 
@@ -22,19 +61,19 @@ export default function About() {
         <div>
           <h3 className="text-xs uppercase tracking-[0.5em] text-white/40 mb-8 font-mono">Nossa Visão</h3>
           <p className="text-white/80 leading-relaxed italic font-premium text-xl">
-            Ser a referência global em soluções digitais que harmonizam sofisticação artística e robustez técnica.
+            {content.vision}
           </p>
         </div>
         <div>
           <h3 className="text-xs uppercase tracking-[0.5em] text-white/40 mb-8 font-mono">Nossa Missão</h3>
           <p className="text-white/80 leading-relaxed italic font-premium text-xl">
-            Transformar desafios complexos em soluções intuitivas e encantadoras através de engenharia sênior.
+            {content.mission}
           </p>
         </div>
         <div>
           <h3 className="text-xs uppercase tracking-[0.5em] text-white/40 mb-8 font-mono">Nosso DNA</h3>
           <p className="text-white/80 leading-relaxed italic font-premium text-xl">
-            Fusão entre design editorial, performance absoluta e tecnologia de processamento em tempo real.
+            {content.dna}
           </p>
         </div>
       </div>
