@@ -235,7 +235,7 @@ export default function App() {
   return (
     <HelmetProvider>
       <SiteSettingsProvider>
-        <Router>
+        <Router basename={import.meta.env.BASE_URL}>
           <SEO />
           <AppContent />
         </Router>

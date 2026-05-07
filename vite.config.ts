@@ -6,8 +6,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const repoName = process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/';
+  
   return {
-    base: mode === 'production' ? './' : '/',
+    base: mode === 'production' && repoName !== '/' ? repoName : '/',
     plugins: [react(), tailwindcss(), VitePWA({
       registerType: 'autoUpdate',
       manifest: {
