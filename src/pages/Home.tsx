@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { ArrowRight, Cpu, Shield, Globe, Terminal, Zap, Layers, Smartphone, 
-  Music, Search, Database, Code2, Rocket, Layout, Mic2, Activity 
+  Search, Database, Code2, Rocket, Layout 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -8,8 +8,9 @@ import { getDocs, collection, query, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
+import { cn } from '../lib/utils';
 
-const iconMap: any = { Globe, Smartphone, Music, Search, Database, Code2, Rocket, Layout, Cpu, Layers };
+const iconMap: any = { Globe, Smartphone, Search, Database, Code2, Rocket, Layout, Cpu, Layers };
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <div className="flex flex-col">
@@ -152,78 +153,87 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Audio Lab Showcase */}
-      <section className="py-32 px-4 relative overflow-hidden">
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-blue-500/[0.02] blur-[150px] rounded-full -z-10" />
-         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-20">
-            <div className="flex-1">
-               <span className="text-[10px] uppercase tracking-[0.4em] text-blue-500 mb-4 block font-bold">Research & Development</span>
-               <h2 className="text-5xl md:text-7xl font-display font-light italic mb-8 tracking-tighter leading-tight">
-                  Engenharia de som em <span className="text-blue-500 font-bold">Tempo Real</span>.
-               </h2>
-               <p className="text-xl text-white/40 font-light leading-relaxed mb-12 max-w-xl">
-                  Exploramos os limites da Web Audio API para criar experiências sonoras imersivas e processamento de sinal de baixa latência diretamente no navegador.
-               </p>
-               <Link to="/lab/audio" className="group flex items-center gap-4 text-xl font-display italic hover:text-blue-500 transition-colors">
-                  Explorar Laboratório de Áudio <ArrowRight className="group-hover:translate-x-2 transition-transform" />
-               </Link>
-            </div>
-            
-            <div className="flex-1 w-full bg-white/[0.02] border border-white/10 rounded-[60px] p-12 relative overflow-hidden group">
-               <div className="flex flex-col gap-6 relative z-10">
-                  <div className="flex justify-between items-center text-[10px] font-mono text-white/20 uppercase tracking-[0.2em]">
-                     <span>Spectrum Analysis</span>
-                     <span>Module V1.0</span>
-                  </div>
-                  <div className="h-40 flex items-end gap-1 px-4">
-                     {[...Array(20)].map((_, i) => (
-                        <motion.div 
-                           key={i}
-                           animate={{ height: [40, 100, 60, 120, 80][i % 5] }}
-                           transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse', delay: i * 0.05 }}
-                           className="flex-1 bg-gradient-to-t from-blue-600 to-purple-600 rounded-t-sm"
-                        />
-                     ))}
-                  </div>
-                  <div className="pt-6 border-t border-white/5 flex justify-between items-center">
-                     <div className="flex gap-4">
-                        <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-blue-500">
-                           <Mic2 size={18} />
-                        </div>
-                        <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-purple-500">
-                           <Activity size={18} />
-                        </div>
-                     </div>
-                     <span className="text-[10px] font-mono text-green-500 font-bold animate-pulse">SYSTEM ACTIVE</span>
-                  </div>
-               </div>
-               
-               {/* Decorative Circle */}
-               <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
-            </div>
-         </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-32 px-4 border-t border-white/5">
+      {/* Testimonials - Layout 3: Tech/Futuristic */}
+      <section className="py-32 px-4 border-t border-white/5 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
+        
         <div className="max-w-7xl mx-auto">
-          <div className="mb-20">
-            <span className="text-purple-400 font-mono text-xs mb-2 tracking-widest uppercase">Feedback</span>
-            <h2 className="text-4xl md:text-6xl font-light tracking-tight">O que dizem nossos parceiros</h2>
+          <div className="mb-20 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em]">Live_Systems_Feedback</span>
+              </div>
+              <h2 className="text-5xl md:text-7xl font-light tracking-tighter text-white leading-none">
+                Confiança <span className="text-blue-500 italic">Codificada.</span>
+              </h2>
+            </div>
+            <div className="hidden md:block text-right">
+              <p className="text-[10px] font-mono text-gray-600 uppercase tracking-widest">[TOTAL_REVIEWS: {testimonials.length}]</p>
+              <p className="text-[10px] font-mono text-gray-600 uppercase tracking-widest">[UPTIME: 99.9%]</p>
+            </div>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {testimonials.map((t, idx) => (
-              <div key={idx} className="glass-card p-12 relative group hover:bg-white/10 transition-all">
-                <div className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
-                <p className="text-xl italic text-gray-300 leading-snug mb-8 relative z-10">
-                  "{t.content}"
-                </p>
-                <div className="relative z-10">
-                  <p className="font-bold tracking-tight text-white">{t.author}</p>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{t.role}</p>
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                className={cn(
+                  "p-8 rounded-[32px] bg-white/[0.02] border border-white/5 relative group hover:border-blue-500/30 transition-all duration-500",
+                  idx === 0 && "md:col-span-2 lg:col-span-2 bg-gradient-to-br from-blue-500/5 to-transparent"
+                )}
+              >
+                {/* Tech Accents */}
+                <div className="absolute top-8 right-8 text-[10px] font-mono text-gray-700 select-none">
+                  0{idx + 1} // FEEDBACK_{idx}
                 </div>
-              </div>
+                
+                <div className="flex flex-col h-full">
+                  <div className="mb-8">
+                    <span className="text-[10px] font-mono text-blue-500/80 bg-blue-500/10 px-2 py-1 rounded-md mb-4 inline-block tracking-tighter uppercase">
+                      [User_Verified_Success]
+                    </span>
+                    <p className={cn(
+                      "text-gray-300 leading-relaxed",
+                      idx === 0 ? "text-2xl font-light" : "text-lg"
+                    )}>
+                      "{t.content}"
+                    </p>
+                  </div>
+
+                  <div className="mt-auto flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      {t.avatar ? (
+                        <div className="relative">
+                          <img src={t.avatar} alt={t.author} className="w-12 h-12 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 border border-white/10" />
+                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-4 border-brand-bg rounded-full" />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center border border-white/5">
+                          <Shield size={20} className="text-blue-500/40" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-white font-bold tracking-tight text-sm">{t.author}</h4>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">{t.role}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-blue-500/50">
+                        <Terminal size={14} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Decoration Lines */}
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-[2px] bg-blue-500/50 group-hover:w-1/2 transition-all duration-700" />
+              </motion.div>
             ))}
           </div>
         </div>

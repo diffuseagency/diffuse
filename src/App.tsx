@@ -1,6 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutGrid, Users, Briefcase, CreditCard, Menu, X, ArrowRight, Music, Shield, Cpu, Mic2 } from 'lucide-react';
+import { LayoutGrid, Users, Briefcase, CreditCard, Menu, X, ArrowRight, Shield, Cpu, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -15,13 +15,17 @@ import About from './pages/About';
 import Services from './pages/Services';
 import Contact from './pages/Contact';
 import Portfolio from './pages/Portfolio';
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import ProjectDetails from './pages/ProjectDetails';
 import ProjectDetailPublic from './pages/ProjectDetailPublic';
-import AudioLab from './pages/AudioLab';
+import BlogPreview from './pages/BlogPreview';
+import Maintenance from './pages/Maintenance';
 import AdminGuard from './components/AdminGuard';
+import PublicRouteGuard from './components/PublicRouteGuard';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 import SEO from './components/SEO';
@@ -247,6 +251,42 @@ export default function App() {
 function AppContent() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
+  const { settings, loading: settingsLoading } = useSiteSettings();
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        try {
+          const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
+          setIsUserAdmin(adminDoc.exists());
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+          setIsUserAdmin(false);
+        }
+      } else {
+        setIsUserAdmin(false);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  const isMaintenanceMode = settings.is_maintenance_mode === 'true';
+  const showMaintenance = isMaintenanceMode && !isUserAdmin && !isAdmin && location.pathname !== '/login';
+
+  if (settingsLoading || authLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="text-white animate-spin" size={32} />
+      </div>
+    );
+  }
+
+  if (showMaintenance) {
+    return <Maintenance />;
+  }
 
   return (
     <div className="min-h-screen bg-brand-bg text-gray-300 selection:bg-white selection:text-black relative overflow-x-hidden">
@@ -263,20 +303,45 @@ function AppContent() {
         <main>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/sobre" element={<About />} />
-            <Route path="/servicos" element={<Services />} />
-            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/sobre" element={
+              <PublicRouteGuard path="/sobre">
+                <About />
+              </PublicRouteGuard>
+            } />
+            <Route path="/servicos" element={
+              <PublicRouteGuard path="/servicos">
+                <Services />
+              </PublicRouteGuard>
+            } />
+            <Route path="/portfolio" element={
+              <PublicRouteGuard path="/portfolio">
+                <Portfolio />
+              </PublicRouteGuard>
+            } />
             <Route path="/portfolio/:slug" element={<ProjectDetailPublic />} />
-            <Route path="/lab/audio" element={<AudioLab />} />
-            <Route path="/contato" element={<Contact />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/admin/preview/:slug" element={
+              <AdminGuard>
+                <BlogPreview />
+              </AdminGuard>
+            } />
+            <Route path="/contato" element={
+              <PublicRouteGuard path="/contato">
+                <Contact />
+              </PublicRouteGuard>
+            } />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/project/:id" element={<ProjectDetails />} />
+            <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/admin/*" element={
               <AdminGuard>
                 <Admin />
               </AdminGuard>
             } />
+            {/* Catch-all route to prevent navigation errors */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         {!isAdmin && <Footer />}

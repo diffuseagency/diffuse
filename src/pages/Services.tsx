@@ -1,12 +1,12 @@
 import { motion } from 'motion/react';
-import { Layout, Smartphone, Globe, Music, Code2, Rocket, Search, Database } from 'lucide-react';
+import { Layout, Smartphone, Globe, Code2, Rocket, Search, Database } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
 
-const iconMap: any = { Globe, Smartphone, Music, Search, Database, Code2, Rocket, Layout };
+const iconMap: any = { Globe, Smartphone, Search, Database, Code2, Rocket, Layout };
 
 const ServiceItem = ({ icon: IconName, title, features, description }: { icon: string, title: string, features: string[], description: string, key?: any }) => {
   const Icon = iconMap[IconName] || Layout;

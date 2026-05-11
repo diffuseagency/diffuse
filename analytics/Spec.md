@@ -1,52 +1,49 @@
-# Especificação Técnica (Pendências) - Diffuse Agency
-**Data e Hora de Geração:** 07/05/2026 11:00 (Horário de Brasília)
+# Especificação Técnica: Finalização do Sistema DIFFUSE
+**Data de Geração:** 11/05/2026 - 08:48:57 (Horário de Brasília)
 
-## 1. Novas Páginas (Pages)
+Este documento detalha as especificações técnicas para a implementação dos itens identificados no `analytics/report.md`.
 
-### 1.1. Portfolio Case Study (`/portfolio/:slug`)
-- **Objetivo:** Página pública detalhada para cada item do portfólio.
-- **Comportamento:** Slug dinâmico carregando dados da coleção `portfolio_details` ou campos estendidos na coleção `portfolio`.
-- **Componentes:**
-    - Hero com imagem de capa (parallax).
-    - Descrição do problema e solução técnica.
-    - Galeria de screenshots com zoom.
-    - Depoimento do cliente específico do projeto.
+## 1. Analytics & Inteligência (Dashboard)
 
-### 1.2. Audio Engineering Lab (`/lab/audio`)
-- **Objetivo:** Showcase da especialidade técnica (Persona).
-- **Comportamento:** Interface interativa captando microfone (Web Audio API), aplicando filtros (BiquadFilterNode) e exibindo Analysers em tempo real.
-- **Integração:** Totalmente client-side para processamento real-time.
+### Página: `AdminOverview.tsx`
+- **Comportamento:** Refatorar a prop `metrics.chartData` no `Admin.tsx` para realizar um reduce dinâmico na coleção `billing`.
+- **Lógica:** Filtrar faturas por `status === 'paid'`, agrupar por mês/ano e somar o total.
+- **Componente:** `Recharts` deve exibir o nome do mês abreviado no eixo X.
 
-## 2. Novos Comportamentos (Behavior)
+## 2. Experiência do Cliente (CRM Central)
 
-### 2.1. Gestão de Entregáveis (Admin -> Clientes)
-- **Fluxo:** No painel de Projetos (`/admin/projetos`), o admin deve poder anexar arquivos (PDF, ZIP, Imagens) a um projeto específico.
-- **Persistência:** Firebase Storage vinculado ao `projectId`.
+### Página: `ClientDashboard.tsx` (Nova)
+- **Acesso:** Rota `/meu-projeto` deve evoluir para `/dashboard-cliente`.
+- **Conteúdo:** 
+  - Listagem de todos os projetos vinculados ao e-mail do cliente logado.
+  - Seção de "Faturas Pendentes" e "Histórico de Pagamentos".
+  - Acesso centralizado à `MediaLibrary` do cliente.
 
-### 2.2. Atualização de Timeline do Projeto
-- **Fluxo:** No modal `ProjectForm`, adicionar um slider ou select para definir a "Etapa Atual" do projeto (0-4).
-- **Impacto:** Refletir diretamente na barra de progresso visual do `ProjectDetails.tsx` (Área do Cliente).
+## 3. Auditoria e Segurança (Admin)
 
-### 2.3. Sistema de Logo Dinâmica
-- **Fluxo:** No CMS (`settings`), adicionar campo de upload `agency_logo`.
-- **Impacto:** Substituir o ícone "D" estático no `Navbar` e `Footer` pela imagem selecionada no CMS.
+### Coleção Firestore: `activity_logs`
+- **Schema:** `{ userId: string, action: string, targetId: string, timestamp: Timestamp, details: string }`.
+- **Behavior:** Adicionar um middleware ou hook global nas funções de escrita do `CMSManager` e `Admin` para registrar automaticamente cada `create`, `update` e `delete`.
 
-## 3. Novos Componentes (Components)
+## 4. Marketing & Conversão
 
-### 3.1. `AudioProcessor.tsx`
-- Componente especializado em processamento de áudio com baixa latência.
-- Visualização de frequência (Oscilloscope) com `motion/react`.
+### Componente: `NewsletterForm.tsx` (Novo)
+- **Localização:** Footer da aplicação pública.
+- **Behavior:** Registro na coleção `leads_newsletter` com validação de formato de e-mail e feedback de sucesso via animação.
+- **Admin:** Aba dedicada no `CMSManager` ou `crm` para exportação de lista CSV.
 
-### 3.2. `ProjectFileVault.tsx`
-- Componente de listagem e download de arquivos com estados de loading e verificação de permissão.
+## 5. Rich Content (Portfólio)
 
-### 3.3. `LeadNotifier.tsx`
-- Sistema de sinalização sonora ou visual no Admin quando uma nova mensagem chegar em real-time.
+### Componente: `TechStackPills.tsx` (Novo)
+- **Uso:** Em `ProjectDetailPublic.tsx`.
+- **Estética:** Tags minimalistas, monocromáticas, usando `font-mono`.
 
-## 4. Ajustes de Dados (Data Models)
-- **`messages`:** Adicionar esquema formal ao `firebase-blueprint.json`.
-- **`portfolio`:** Adicionar campos `slug`, `full_description`, `challenge_text`, `solution_text`.
-- **`projects`:** Adicionar campo `current_step` (number) e `assets` (array of objects).
+### Comportamento: SEO Avançado
+- **CMS:** Adicionar campos `og_image` e `og_description` em `posts` e `projects`.
+- **SEO.tsx:** Atualizar o componente para consumir esses campos prioritariamente se disponíveis.
 
----
-*Fim da Especificação.*
+## 6. Configurações de Sistema
+
+### Funcionalidade: Maintenance Mode
+- **Persistence:** Campo `is_maintenance_mode` na coleção `settings`.
+- **Behavior:** Se ativo, redirecionar todas as rotas públicas (exceto `/admin`) para `pages/Maintenance.tsx`.

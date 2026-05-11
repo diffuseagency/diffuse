@@ -39,6 +39,27 @@ export default function SEO({ title, description, image, article }: SEOProps) {
       {seo.description && <meta name="twitter:description" content={seo.description} />}
       {seo.image && <meta name="twitter:image" content={seo.image} />}
 
+      <script type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": article ? "Article" : "Organization",
+          "name": settings.agency_name || "Diffuse Agency",
+          "headline": seo.title,
+          "description": seo.description,
+          "image": seo.image,
+          "url": seo.url,
+          ...(article ? {
+            "datePublished": new Date().toISOString(),
+            "author": {
+              "@type": "Person",
+              "name": "Diffuse Agency Editorial"
+            }
+          } : {
+            "logo": seo.image || "https://diffuse.agency/logo.png"
+          })
+        })}
+      </script>
+
       {settings.analytics_id && !window.location.pathname.startsWith('/admin') && (
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${settings.analytics_id}`}></script>
       )}

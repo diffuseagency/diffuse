@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useSiteSettings } from '../lib/useSiteSettings';
+import NewsletterForm from './NewsletterForm';
 
 export default function Footer() {
   const { settings } = useSiteSettings();
@@ -80,6 +81,11 @@ export default function Footer() {
               <li className="text-white/60">{settings?.footer_phone || '+55 11 99999-0000'}</li>
               <li className="text-white/60">{settings?.footer_email || 'hello@diffuse.tech'}</li>
             </ul>
+          </div>
+          <div className="space-y-6 hidden lg:block">
+            <p className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Newsletter</p>
+            <p className="text-xs text-white/40 mb-4 font-light leading-relaxed">Assine para receber insights sobre <br />arquitetura digital e tecnologia.</p>
+            <NewsletterForm />
           </div>
           <div className="space-y-6 hidden lg:block">
             <p className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Legal</p>

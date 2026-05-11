@@ -157,7 +157,7 @@ if (clientCount.count === 0) {
   insertBilling.run(2, 8000, 'paid', '2026-03-20');
 
   const insertTestimonial = db.prepare('INSERT INTO testimonials (author, role, content) VALUES (?, ?, ?)');
-  insertTestimonial.run('Ricardo Mendes', 'CEO, SoundWave', 'A DIFFUSE elevou nosso sistema a um nível de excelência que não achávamos possível.');
+  insertTestimonial.run('Ricardo Mendes', 'CEO, TechNova', 'A DIFFUSE elevou nosso ecossistema digital a um nível de excelência que superou todas as expectativas.');
   insertTestimonial.run('Ana Oliveira', 'Marketing Manager, Flow', 'Profissionalismo e design sofisticado em cada detalhe do nosso novo site.');
 
   // CMS Seeds

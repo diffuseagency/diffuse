@@ -13,11 +13,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
 
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'diffuseagency@gmail.com';
+    }
+
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'diffuseagency@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+      return isSuperAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isValidId(id) {
@@ -46,9 +47,11 @@ service cloud.firestore {
              (doc.get('full_description', '') is string) &&
              (doc.get('challenge_text', '') is string) &&
              (doc.get('solution_text', '') is string) &&
+             (doc.get('tech_stack', []) is list) &&
              (doc.get('gallery', []) is list) &&
-             (doc.get('client_name', '') is string) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('og_image', '') is string) &&
+             (doc.get('og_description', '') is string) &&
+             (doc.get('client_name', '') is string);
     }
 
     function isValidService(doc) {
@@ -56,8 +59,7 @@ service cloud.firestore {
              doc.title is string && doc.title.size() <= 200 &&
              (doc.get('description', '') is string) &&
              (doc.get('icon', '') is string) &&
-             (doc.get('features', []) is list) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('features', []) is list);
     }
 
     function isValidTestimonial(doc) {
@@ -65,8 +67,8 @@ service cloud.firestore {
              doc.author is string && doc.author.size() <= 100 &&
              doc.content is string && doc.content.size() <= 1000 &&
              (doc.get('role', '') is string) &&
-             (doc.get('rating', 5) is int) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('avatar', '') is string) &&
+             (doc.get('rating', 5) is int);
     }
 
     function isValidSetting(doc) {
@@ -97,8 +99,7 @@ service cloud.firestore {
       return doc.keys().hasAll(['name', 'email']) &&
              doc.name is string && doc.name.size() <= 100 &&
              doc.email is string && doc.email.size() <= 100 &&
-             (doc.get('company', '') is string) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('company', '') is string);
     }
 
     function isValidProject(doc) {
@@ -108,16 +109,14 @@ service cloud.firestore {
              doc.title is string && doc.title.size() <= 200 &&
              (doc.get('status', 'active') in ['active', 'completed', 'on-hold', 'discovery']) &&
              (doc.get('current_step', 0) is int) &&
-             (doc.get('assets', []) is list) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('assets', []) is list);
     }
 
     function isValidBilling(doc) {
       return doc.keys().hasAll(['project_id', 'amount']) &&
              doc.project_id is string && isValidId(doc.project_id) &&
              doc.amount is number &&
-             (doc.get('status', 'unpaid') in ['paid', 'unpaid', 'overdue']) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('status', 'unpaid') in ['paid', 'unpaid', 'overdue']);
     }
 
     function isValidMessage(doc) {
@@ -126,8 +125,42 @@ service cloud.firestore {
              doc.email is string && doc.email.size() <= 100 &&
              doc.message is string && doc.message.size() <= 2000 &&
              (doc.get('subject', '') is string) &&
-             (doc.get('status', 'new') in ['new', 'read', 'replied']) &&
-             (doc.get('createdAt', request.time) == request.time);
+             (doc.get('status', 'new') in ['new', 'read', 'replied']);
+    }
+
+    function isValidPost(doc) {
+      return doc.keys().hasAll(['title', 'slug', 'content']) &&
+             doc.title is string && doc.title.size() <= 200 &&
+             doc.slug is string && doc.slug.size() <= 200 &&
+             doc.content is string && doc.content.size() <= 100000 &&
+             (doc.get('excerpt', '') is string) &&
+             (doc.get('category', '') is string) &&
+             (doc.get('author', '') is string) &&
+             (doc.get('status', 'draft') in ['draft', 'published']) &&
+             (doc.get('featuredImage', '') is string) &&
+             (doc.get('og_image', '') is string) &&
+             (doc.get('og_description', '') is string) &&
+             (doc.get('tags', []) is list);
+    }
+
+    function isValidActivityLog(doc) {
+      return doc.keys().hasAll(['userId', 'action', 'timestamp']) &&
+             doc.userId is string &&
+             doc.action is string &&
+             doc.timestamp is timestamp;
+    }
+
+    function isValidNewsletterLead(doc) {
+      return doc.keys().hasAll(['email', 'createdAt']) &&
+             doc.email is string && doc.email.size() <= 100 &&
+             doc.createdAt is timestamp &&
+             (doc.get('status', 'active') in ['active', 'unsubscribed']);
+    }
+
+    function isValidAdmin(doc) {
+      return doc.keys().hasAll(['name', 'email']) &&
+             doc.name is string && doc.name.size() <= 100 &&
+             doc.email is string && doc.email.size() <= 100;
     }
 
     // ---------------------------------------------------------
@@ -140,18 +173,22 @@ service cloud.firestore {
     }
 
     match /admins/{adminId} {
-      allow read: if isSignedIn() && request.auth.uid == adminId;
-      allow write: if false;
+      allow list: if isAdmin();
+      allow get: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+      allow create, update: if isAdmin() && isValidAdmin(incoming());
+      allow delete: if isAdmin() && adminId != request.auth.uid;
     }
 
     match /messages/{messageId} {
       allow list, get, update, delete: if isAdmin();
-      allow create: if isValidMessage(incoming()) && isValidId(messageId);
+      allow create: if isValidMessage(incoming()) && isValidId(messageId) &&
+                       incoming().createdAt == request.time;
     }
 
     match /portfolio/{itemId} {
       allow read: if true;
-      allow create: if isAdmin() && isValidPortfolio(incoming()) && isValidId(itemId);
+      allow create: if isAdmin() && isValidPortfolio(incoming()) && isValidId(itemId) &&
+                       incoming().createdAt == request.time;
       allow update: if isAdmin() && isValidPortfolio(incoming()) &&
                        incoming().createdAt == existing().createdAt;
       allow delete: if isAdmin();
@@ -159,7 +196,8 @@ service cloud.firestore {
 
     match /services/{serviceId} {
       allow read: if true;
-      allow create: if isAdmin() && isValidService(incoming()) && isValidId(serviceId);
+      allow create: if isAdmin() && isValidService(incoming()) && isValidId(serviceId) &&
+                       incoming().createdAt == request.time;
       allow update: if isAdmin() && isValidService(incoming()) &&
                        incoming().createdAt == existing().createdAt;
       allow delete: if isAdmin();
@@ -167,7 +205,8 @@ service cloud.firestore {
 
     match /testimonials/{testId} {
       allow read: if true;
-      allow create: if isAdmin() && isValidTestimonial(incoming()) && isValidId(testId);
+      allow create: if isAdmin() && isValidTestimonial(incoming()) && isValidId(testId) &&
+                       incoming().createdAt == request.time;
       allow update: if isAdmin() && isValidTestimonial(incoming()) &&
                        incoming().createdAt == existing().createdAt;
       allow delete: if isAdmin();
@@ -193,8 +232,10 @@ service cloud.firestore {
     }
 
     match /clients/{clientId} {
-      allow read: if isAdmin() || (isSignedIn() && existing().email == request.auth.token.email);
-      allow create: if isAdmin() && isValidClient(incoming()) && isValidId(clientId);
+      allow get: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
+      allow create: if isAdmin() && isValidClient(incoming()) && isValidId(clientId) &&
+                       incoming().createdAt == request.time;
       allow update: if isAdmin() && isValidClient(incoming()) &&
                        incoming().createdAt == existing().createdAt;
       allow delete: if isAdmin();
@@ -203,18 +244,42 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow get: if isAdmin() || (isSignedIn() && existing().client_email == request.auth.token.email);
       allow list: if isAdmin() || (isSignedIn() && resource.data.client_email == request.auth.token.email);
-      allow create: if isAdmin() && isValidProject(incoming()) && isValidId(projectId);
-      allow update: if (isAdmin() && isValidProject(incoming())) ||
-                       (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['assets']) && isValidProject(incoming()));
+      allow create: if isAdmin() && isValidProject(incoming()) && isValidId(projectId) &&
+                       incoming().createdAt == request.time;
+      allow update: if (isAdmin() && isValidProject(incoming()) && incoming().createdAt == existing().createdAt) ||
+                       (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['assets']) && isValidProject(incoming()) && incoming().createdAt == existing().createdAt);
       allow delete: if isAdmin();
     }
 
     match /billing/{billId} {
       allow get: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/projects/$(existing().project_id)).data.client_email == request.auth.token.email);
-      allow list: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/projects/$(resource.data.project_id)).data.client_email == request.auth.token.email);
-      allow create: if isAdmin() && isValidBilling(incoming()) && isValidId(billId);
-      allow update: if isAdmin() && isValidBilling(incoming());
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidBilling(incoming()) && isValidId(billId) &&
+                       incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidBilling(incoming()) &&
+                       incoming().createdAt == existing().createdAt;
       allow delete: if isAdmin();
+    }
+
+    match /posts/{postId} {
+      allow get: if isAdmin() || resource.data.status == 'published';
+      allow list: if isAdmin() || resource.data.status == 'published';
+      allow create: if isAdmin() && isValidPost(incoming()) && isValidId(postId) &&
+                       incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidPost(incoming()) &&
+                       incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /activity_logs/{logId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /newsletter_leads/{leadId} {
+      allow list, get, update, delete: if isAdmin();
+      allow create: if isValidNewsletterLead(incoming()) && 
+                       incoming().createdAt == request.time;
     }
 
     match /test/connection {

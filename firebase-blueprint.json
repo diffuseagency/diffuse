@@ -39,16 +39,19 @@
         "full_description": { "type": "string" },
         "challenge_text": { "type": "string" },
         "solution_text": { "type": "string" },
+        "tech_stack": { "type": "array", "items": { "type": "string" } },
         "gallery": { "type": "array", "items": { "type": "string" } },
         "client_name": { "type": "string" },
         "client_testimonial": { "type": "string" },
+        "og_image": { "type": "string" },
+        "og_description": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "slug"]
     },
     "SiteSetting": {
       "title": "Site Setting",
-      "description": "Key-value pair for site content. Common keys: about_manifesto, about_vision, about_mission, about_dna, seo_title, seo_description, analytics_id.",
+      "description": "Key-value pair for site content. Common keys: about_manifesto, about_vision, about_mission, about_dna, seo_title, seo_description, analytics_id, is_maintenance_mode.",
       "type": "object",
       "properties": {
         "key": { "type": "string" },
@@ -153,9 +156,70 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "email", "message"]
+    },
+    "Post": {
+      "title": "Blog Post",
+      "description": "Article for the agency journal.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "content": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "category": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "featuredImage": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "og_image": { "type": "string" },
+        "og_description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "slug", "content"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Record of administrative actions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "targetCollection": { "type": "string" },
+        "targetId": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "timestamp"]
+    },
+    "NewsletterLead": {
+      "title": "Newsletter Lead",
+      "description": "Subscription for news and updates.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "status": { "type": "string", "enum": ["active", "unsubscribed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Admin": {
+      "title": "Administrator",
+      "description": "System administrator account.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      },
+      "required": ["name", "email"]
     }
   },
   "firestore": {
+    "admins": {
+      "schema": "Admin",
+      "description": "Authorized administrative accounts."
+    },
     "testimonials": {
       "schema": "Testimonial",
       "description": "Public testimonials."
@@ -195,6 +259,18 @@
     "messages": {
       "schema": "Message",
       "description": "Inbound leads."
+    },
+    "posts": {
+      "schema": "Post",
+      "description": "Journal articles."
+    },
+    "activity_logs": {
+      "schema": "ActivityLog",
+      "description": "Administrative audit trail."
+    },
+    "newsletter_leads": {
+      "schema": "NewsletterLead",
+      "description": "Marketing leads."
     }
   }
 }

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Loader2, Calendar, Tag, User, Quote, ArrowRight } from 'lucide-react';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
+import TechStackPills from '../components/TechStackPills';
 
 export default function ProjectDetailPublic() {
   const { slug } = useParams();
@@ -63,6 +64,7 @@ export default function ProjectDetailPublic() {
       <SEO 
         title={`${project.title} | Case Study | ${settings.agency_name || 'Diffuse'}`}
         description={project.full_description || project.title}
+        image={project.image}
       />
 
       {/* Hero Section */}
@@ -108,6 +110,12 @@ export default function ProjectDetailPublic() {
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">Cliente</span>
                   <span className="text-sm font-medium">{project.client_name}</span>
+                </div>
+              )}
+              {project.tech_stack && project.tech_stack.length > 0 && (
+                <div className="flex flex-col gap-3 min-w-[200px]">
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest">Tech Stack</span>
+                  <TechStackPills stack={project.tech_stack} />
                 </div>
               )}
             </div>

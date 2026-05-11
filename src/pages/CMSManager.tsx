@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Save, Plus, Trash2, Edit3, Image as ImageIcon, Type, Layout, Star, 
   MessageSquare, Loader2, Instagram, Linkedin, Github, Mail, Phone, MapPin,
-  Smartphone, Globe, Music, Code2, Rocket, Search, Database,
-  GripVertical
+  Smartphone, Globe, Code2, Rocket, Search, Database,
+  GripVertical, Eye, EyeOff
 } from 'lucide-react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
+import { logActivity, ActionType } from '../lib/activityLogger';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -18,11 +21,12 @@ function cn(...inputs: ClassValue[]) {
 import { addFirestoreDoc, updateFirestoreDoc, deleteFirestoreDoc } from '../lib/cmsHooks';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MediaLibrary from '../components/MediaLibrary';
+import ReactMarkdown from 'react-markdown';
 
-const iconMap = { Globe, Smartphone, Music, Search, Database, Code2, Rocket, Layout };
+const iconMap = { Globe, Smartphone, Search, Database, Code2, Rocket, Layout };
 
 export default function CMSManager() {
-  const [activeTab, setActiveTab] = useState<'settings' | 'services' | 'portfolio' | 'testimonials' | 'contact' | 'footer' | 'institucional' | 'navigation' | 'media'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'services' | 'portfolio' | 'testimonials' | 'contact' | 'footer' | 'institucional' | 'navigation' | 'media' | 'posts' | 'admins'>('settings');
   const [navFilter, setNavFilter] = useState<'header' | 'footer' | 'legal'>('header');
   const [showMediaPicker, setShowMediaPicker] = useState<{ isOpen: boolean, targetField: string } | null>(null);
   const [settings, setSettings] = useState<any>({});
@@ -30,7 +34,10 @@ export default function CMSManager() {
   const [portfolio, setPortfolio] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [navigation, setNavigation] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [previewMarkdown, setPreviewMarkdown] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean, id: string, collection: string } | null>(null);
 
@@ -45,12 +52,14 @@ export default function CMSManager() {
 
   const fetchData = async () => {
     try {
-        const [settingsSnap, servicesSnap, portfolioSnap, testimonialsSnap, navigationSnap] = await Promise.all([
+        const [settingsSnap, servicesSnap, portfolioSnap, testimonialsSnap, navigationSnap, postsSnap, adminsSnap] = await Promise.all([
             getDocs(collection(db, 'settings')),
             getDocs(collection(db, 'services')),
             getDocs(collection(db, 'portfolio')),
             getDocs(collection(db, 'testimonials')),
-            getDocs(collection(db, 'navigation'))
+            getDocs(collection(db, 'navigation')),
+            getDocs(collection(db, 'posts')),
+            getDocs(collection(db, 'admins'))
         ]);
         const sData: any = {};
         settingsSnap.docs.forEach(d => sData[d.data().key] = d.data().value);
@@ -59,8 +68,10 @@ export default function CMSManager() {
         setPortfolio(portfolioSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setTestimonials(testimonialsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setNavigation(navigationSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+        setPosts(postsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAdmins(adminsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
-        showMessage('Erro ao carregar dados', 'error');
+        handleFirestoreError(e, OperationType.LIST, 'multiple collections');
     }
   };
 
@@ -94,17 +105,19 @@ export default function CMSManager() {
     setLoading(true);
     try {
         const settingsSnap = await getDocs(collection(db, 'settings'));
-        for (const [key, value] of Object.entries(settings)) {
+        const promises = Object.entries(settings).map(async ([key, value]) => {
             const settingDoc = settingsSnap.docs.find(d => d.data().key === key);
             if (settingDoc) {
-                await updateFirestoreDoc('settings', settingDoc.id, { key, value });
+                return updateFirestoreDoc('settings', settingDoc.id, { key, value });
             } else {
-                await addFirestoreDoc('settings', { key, value });
+                return addFirestoreDoc('settings', { key, value });
             }
-        }
+        });
+        await Promise.all(promises);
+        await logActivity(ActionType.SETTINGS_CHANGE, 'settings', 'all', 'Atualização em massa de configurações globais');
         showMessage('Configurações salvas!');
     } catch (e) {
-        showMessage('Erro ao salvar', 'error');
+        handleFirestoreError(e, OperationType.WRITE, 'settings');
     } finally {
         setLoading(false);
     }
@@ -119,10 +132,11 @@ export default function CMSManager() {
     setLoading(true);
     try {
         await deleteFirestoreDoc(deleteConfirm.collection, deleteConfirm.id);
+        await logActivity(ActionType.DELETE, deleteConfirm.collection, deleteConfirm.id, `Exclusão de item`);
         fetchData();
         showMessage('Excluído com sucesso!');
     } catch (e) {
-        showMessage('Erro ao excluir', 'error');
+        handleFirestoreError(e, OperationType.DELETE, deleteConfirm.collection);
     } finally {
         setLoading(false);
         setDeleteConfirm(null);
@@ -134,10 +148,11 @@ export default function CMSManager() {
     try {
         const { id, ...data } = item;
         await updateFirestoreDoc(collectionName, id, data);
+        await logActivity(ActionType.UPDATE, collectionName, id, `Atualização de registro`);
         fetchData();
         showMessage('Atualizado com sucesso!');
     } catch (e) {
-        showMessage('Erro ao atualizar', 'error');
+        handleFirestoreError(e, OperationType.UPDATE, collectionName);
     } finally {
         setLoading(false);
     }
@@ -174,7 +189,7 @@ export default function CMSManager() {
       showMessage('Ordem atualizada!');
     } catch (error) {
       console.error("Reorder error:", error);
-      showMessage('Erro ao salvar nova ordem', 'error');
+      handleFirestoreError(error, OperationType.UPDATE, 'navigation');
       fetchData(); // Rollback
     } finally {
       setLoading(false);
@@ -185,10 +200,11 @@ export default function CMSManager() {
     setLoading(true);
     try {
         await addFirestoreDoc(collectionName, item);
+        await logActivity(ActionType.CREATE, collectionName, 'new', `Criação de novo registro`);
         fetchData();
         showMessage('Criado com sucesso!');
     } catch (e) {
-        showMessage('Erro ao criar', 'error');
+        handleFirestoreError(e, OperationType.CREATE, collectionName);
     } finally {
         setLoading(false);
     }
@@ -254,6 +270,16 @@ export default function CMSManager() {
                         data.features = data.features.split('\n').map((f: any) => f.trim()).filter((f: any) => f !== '');
                     }
 
+                    // Process tech stack for portfolio
+                    if (activeTab === 'portfolio' && typeof data.tech_stack === 'string') {
+                        data.tech_stack = data.tech_stack.split(',').map((f: any) => f.trim()).filter((f: any) => f !== '');
+                    }
+
+                    // Process tags if it's a post
+                    if (activeTab === 'posts' && typeof data.tags === 'string') {
+                        data.tags = data.tags.split(',').map((f: any) => f.trim()).filter((f: any) => f !== '');
+                    }
+
                     // Process gallery if it's a portfolio item
                     if (activeTab === 'portfolio' && typeof data.gallery === 'string') {
                         data.gallery = data.gallery.split('\n').map((f: any) => f.trim()).filter((f: any) => f !== '');
@@ -267,7 +293,25 @@ export default function CMSManager() {
                     if (editingItem?.id) {
                         await handleUpdate(activeTab, { id: editingItem.id, ...data });
                     } else {
-                        await handleCreate(activeTab, data);
+                        if (activeTab === 'admins' && data.id) {
+                            const { id, ...adminData } = data;
+                            setLoading(true);
+                            try {
+                                await setDoc(doc(db, 'admins', id), {
+                                    ...adminData,
+                                    createdAt: serverTimestamp()
+                                });
+                                await logActivity(ActionType.CREATE, 'admins', id, `Novo administrador adicionado: ${adminData.name}`);
+                                fetchData();
+                                showMessage('Admin criado com sucesso!');
+                            } catch (e: any) {
+                                handleFirestoreError(e, OperationType.CREATE, 'admins');
+                            } finally {
+                                setLoading(false);
+                            }
+                        } else {
+                            await handleCreate(activeTab, data);
+                        }
                     }
                     setShowModal(false);
                   }}
@@ -314,7 +358,6 @@ export default function CMSManager() {
                                 <select name="icon" defaultValue={editingItem?.icon} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
                                     <option value="Globe">Globo</option>
                                     <option value="Smartphone">Mobile</option>
-                                    <option value="Music">Áudio</option>
                                     <option value="Search">SEO</option>
                                     <option value="Database">Backend</option>
                                     <option value="Code2">Desenvolvimento</option>
@@ -403,6 +446,21 @@ export default function CMSManager() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Tech Stack (Separadas por vírgula)</label>
+                                    <input name="tech_stack" defaultValue={editingItem?.tech_stack?.join(', ')} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">OG Image (SEO)</label>
+                                    <input name="og_image" defaultValue={editingItem?.og_image} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">OG Description (SEO)</label>
+                                <textarea name="og_description" defaultValue={editingItem?.og_description} rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase">Nome do Cliente</label>
                                     <input name="client_name" defaultValue={editingItem?.client_name} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
                                 </div>
@@ -416,24 +474,183 @@ export default function CMSManager() {
                     {activeTab === 'testimonials' && (
                         <>
                             <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Avatar (URL)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        name="avatar" 
+                                        value={editingItem?.avatar || ''} 
+                                        onChange={e => setEditingItem({...editingItem, avatar: e.target.value})}
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500/50 outline-none transition-all" 
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowMediaPicker({ isOpen: true, targetField: 'avatar' })}
+                                        className="px-4 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
+                                    >
+                                        <ImageIcon size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Autor</label>
-                                <input name="author" defaultValue={editingItem?.author} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                <input 
+                                    name="author" 
+                                    value={editingItem?.author || ''} 
+                                    onChange={e => setEditingItem({...editingItem, author: e.target.value})}
+                                    required 
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500/50 outline-none transition-all" 
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Função</label>
-                                <input name="role" defaultValue={editingItem?.role} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                <input 
+                                    name="role" 
+                                    value={editingItem?.role || ''} 
+                                    onChange={e => setEditingItem({...editingItem, role: e.target.value})}
+                                    required 
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500/50 outline-none transition-all" 
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Depoimento</label>
-                                <textarea name="content" defaultValue={editingItem?.content} required rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                <textarea 
+                                    name="content" 
+                                    value={editingItem?.content || ''} 
+                                    onChange={e => setEditingItem({...editingItem, content: e.target.value})}
+                                    required 
+                                    rows={4} 
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500/50 outline-none transition-all resize-none shadow-inner" 
+                                />
+                            </div>
+                        </>
+                    )}
+                    {activeTab === 'posts' && (
+                        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4 scrollbar-hide">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Título do Post</label>
+                                    <input name="title" defaultValue={editingItem?.title} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Slug (URL)</label>
+                                    <input name="slug" defaultValue={editingItem?.slug} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" placeholder="como-fazer-x" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Categoria</label>
+                                    <input name="category" defaultValue={editingItem?.category} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Status</label>
+                                    <select name="status" defaultValue={editingItem?.status || 'draft'} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold uppercase text-[10px] tracking-widest">
+                                        <option value="draft">Rascunho</option>
+                                        <option value="published">Publicado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Imagem de Capa</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        name="featuredImage" 
+                                        value={editingItem?.featuredImage || ''} 
+                                        onChange={e => setEditingItem({...editingItem, featuredImage: e.target.value})}
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowMediaPicker({ isOpen: true, targetField: 'featuredImage' })}
+                                        className="px-4 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white"
+                                    >
+                                        <ImageIcon size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Resumo (Excerpt)</label>
+                                <textarea name="excerpt" defaultValue={editingItem?.excerpt} rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">OG Image (SEO)</label>
+                                    <input name="og_image" defaultValue={editingItem?.og_image} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">OG Description (SEO)</label>
+                                    <input name="og_description" defaultValue={editingItem?.og_description} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Conteúdo (Markdown)</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setPreviewMarkdown(!previewMarkdown)}
+                                        className={cn(
+                                            "text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded transition-all",
+                                            previewMarkdown ? "bg-blue-500 text-white" : "bg-white/5 text-gray-500 hover:text-white"
+                                        )}
+                                    >
+                                        {previewMarkdown ? 'Editar' : 'Visualizar'}
+                                    </button>
+                                </div>
+                                {previewMarkdown ? (
+                                    <div className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white min-h-[250px] overflow-y-auto prose prose-invert prose-sm max-w-none">
+                                        <ReactMarkdown>{editingItem?.content || ''}</ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <textarea 
+                                        name="content" 
+                                        value={editingItem?.content || ''} 
+                                        onChange={(e) => setEditingItem({ ...editingItem, content: e.target.value })}
+                                        rows={10} 
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono text-xs" 
+                                    />
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Autor</label>
+                                    <input name="author" defaultValue={editingItem?.author} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Tags (Separadas por vírgula)</label>
+                                    <input name="tags" defaultValue={editingItem?.tags?.join(', ')} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Data</label>
+                                <input type="date" name="date" defaultValue={editingItem?.date || new Date().toISOString().split('T')[0]} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'admins' && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">UID do Usuário (Firebase)</label>
+                                <input name="id" defaultValue={editingItem?.id} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" placeholder="UID oficial do Firebase Auth" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Nome / Apelido</label>
+                                <input name="name" defaultValue={editingItem?.name} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">E-mail</label>
+                                <input name="email" defaultValue={editingItem?.email} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
                             </div>
                         </>
                     )}
 
                     <div className="flex gap-4 pt-4">
-                        <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 bg-white/5 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white/10">Cancelar</button>
-                        <button type="submit" disabled={loading} className="flex-1 py-4 bg-blue-500 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-blue-600 transition-all disabled:opacity-50 shadow-lg shadow-blue-500/20">
-                            {loading ? 'Salvando...' : 'Confirmar Registro Master'}
+                        <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 bg-white/5 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white/10 active:scale-95 transition-all">Cancelar</button>
+                        <button 
+                            type="submit" 
+                            disabled={loading} 
+                            className="flex-1 py-4 bg-blue-500 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-blue-600 transition-all disabled:opacity-50 shadow-lg shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : (editingItem?.id ? 'Atualizar Registro' : 'Confirmar Novo Registro')}
                         </button>
                     </div>
                 </form>
@@ -474,6 +691,8 @@ export default function CMSManager() {
             { id: 'portfolio', label: 'Portfólio', icon: ImageIcon },
             { id: 'testimonials', label: 'Depoimentos', icon: Star },
             { id: 'footer', label: 'Rodapé', icon: Layout },
+            { id: 'posts', label: 'Blog', icon: MessageSquare },
+            { id: 'admins', label: 'Acessos', icon: Database },
           ].map(tab => (
             <button
               key={tab.id}
@@ -490,6 +709,105 @@ export default function CMSManager() {
       </div>
 
       <div className="glass-card p-8 !rounded-[40px] border-white/10">
+        {activeTab === 'admins' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+              <div>
+                <h3 className="text-white font-bold text-sm">Privilégios Administrativos</h3>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Gestão de UIDs Autorizados</p>
+              </div>
+              <button onClick={openCreateModal} className="flex items-center gap-2 px-6 py-3 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10">
+                <Plus size={14} /> Adicionar Admin
+              </button>
+            </div>
+            <div className="bg-white/5 border border-white/5 rounded-[32px] overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
+                  <tr>
+                    <th className="px-6 py-4 font-bold">Nome</th>
+                    <th className="px-6 py-4 font-bold">Identificador (UID)</th>
+                    <th className="px-6 py-4 font-bold text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-white/80">
+                  {admins.map(admin => (
+                    <tr key={admin.id} className="hover:bg-white/[0.02] transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-sm text-white">{admin.name}</div>
+                        <div className="text-[10px] text-white/40">{admin.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <code className="text-[10px] bg-white/5 px-2 py-1 rounded text-white/60 group-hover:text-blue-400 transition-colors">{admin.id}</code>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => openEditModal(admin)} className="p-2 text-gray-500 hover:text-white transition-all"><Edit3 size={16} /></button>
+                          <button onClick={() => handleDelete('admins', admin.id)} 
+                            className={cn(
+                              "p-2 transition-all",
+                              admin.email === 'diffuseagency@gmail.com' ? "opacity-10 text-gray-500 cursor-not-allowed" : "text-red-500/40 hover:text-red-500"
+                            )}
+                            disabled={admin.email === 'diffuseagency@gmail.com'}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {admins.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-20 text-center text-gray-500 italic text-[10px] uppercase tracking-widest">Nenhum admin secundário cadastrado.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'posts' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+              <div>
+                <h3 className="text-white font-bold text-sm">Gerenciar Journal</h3>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Postagens do Blog</p>
+              </div>
+              <button onClick={openCreateModal} className="flex items-center gap-2 px-6 py-3 bg-blue-500/10 border border-blue-500/30 text-blue-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all shadow-lg shadow-blue-500/10">
+                <Plus size={14} /> Novo Artigo
+              </button>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {posts.map(post => (
+                <div key={post.id} className="p-6 bg-white/5 border border-white/5 rounded-3xl group">
+                  <div className="aspect-video rounded-2xl overflow-hidden mb-4 border border-white/10">
+                    <img src={post.featuredImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80'} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                  </div>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[8px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-widest">{post.category}</span>
+                    <span className={cn(
+                      "text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-widest",
+                      post.status === 'published' ? "bg-green-500/20 text-green-500" : "bg-gray-500/20 text-gray-500"
+                    )}>
+                      {post.status === 'published' ? 'Publicado' : 'Rascunho'}
+                    </span>
+                  </div>
+                  <h4 className="text-white font-bold text-sm mb-4 line-clamp-2">{post.title}</h4>
+                  <div className="flex justify-end gap-2 pt-4 border-t border-white/5">
+                    <Link to={`/admin/preview/${post.slug}`} className="p-2 text-blue-500/40 hover:text-blue-500 transition-all" title="Visualizar Rascunho"><Eye size={16} /></Link>
+                    <button onClick={() => openEditModal(post)} className="p-2 text-gray-500 hover:text-white transition-all"><Edit3 size={16} /></button>
+                    <button onClick={() => handleDelete('posts', post.id)} className="p-2 text-red-500/40 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+              {posts.length === 0 && (
+                <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[40px]">
+                  <p className="text-gray-500 text-[10px] uppercase tracking-widest">Nenhum post publicado ainda.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'media' && (
           <div className="h-[600px]">
             <MediaLibrary />
@@ -573,6 +891,16 @@ export default function CMSManager() {
                                 </div>
                               </div>
                               <div className="flex gap-2">
+                                <button 
+                                  onClick={() => handleUpdate('navigation', { ...link, isActive: link.isActive === false ? true : false })} 
+                                  className={cn(
+                                    "p-2 transition-all rounded-lg",
+                                    link.isActive === false ? "text-gray-600 hover:text-white" : "text-blue-500 hover:text-blue-400 bg-blue-500/10"
+                                  )}
+                                  title={link.isActive === false ? "Mostrar no Menu" : "Ocultar do Menu"}
+                                >
+                                  {link.isActive === false ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                                 <button onClick={() => openEditModal(link)} className="p-2 text-gray-500 hover:text-white transition-all"><Edit3 size={16} /></button>
                                 <button onClick={() => handleDelete('navigation', link.id)} className="p-2 text-red-500/40 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
                               </div>
@@ -630,6 +958,22 @@ export default function CMSManager() {
                   onChange={e => setSettings({ ...settings, agency_name: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
                 />
+                <div className="mt-4 p-4 border border-blue-500/20 bg-blue-500/5 rounded-2xl flex items-center justify-between">
+                     <div>
+                        <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Modo Manutenção</p>
+                        <p className="text-[8px] text-blue-400/60 uppercase">Bloqueia acesso público ao site</p>
+                     </div>
+                     <button 
+                        type="button"
+                        onClick={() => setSettings({...settings, is_maintenance_mode: settings.is_maintenance_mode === 'true' ? 'false' : 'true'})}
+                        className={cn(
+                            "px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
+                            settings.is_maintenance_mode === 'true' ? "bg-red-500 text-white" : "bg-white/10 text-white/40"
+                        )}
+                     >
+                        {settings.is_maintenance_mode === 'true' ? 'Ativado' : 'Desativado'}
+                     </button>
+                  </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Slogan</label>
@@ -928,10 +1272,14 @@ export default function CMSManager() {
               <div key={idx} className="p-6 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-all">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500" />
+                    {t.avatar ? (
+                      <img src={t.avatar} alt={t.author} className="w-10 h-10 rounded-full object-cover border border-white/10" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500" />
+                    )}
                     <div>
-                      <h4 className="font-bold text-white">{t.author}</h4>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">{t.role}</p>
+                      <h4 className="font-bold text-white text-sm tracking-tight">{t.author}</h4>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">{t.role}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">

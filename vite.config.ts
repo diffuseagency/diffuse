@@ -9,7 +9,7 @@ export default defineConfig(({mode}) => {
   const repoName = process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/';
   
   return {
-    base: mode === 'production' && repoName !== '/' ? repoName : '/',
+    base: '/',
     plugins: [react(), tailwindcss(), VitePWA({
       registerType: 'autoUpdate',
       manifest: {

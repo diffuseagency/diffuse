@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
+import { useFavicon } from '../hooks/useFavicon';
 
 interface SiteSettings {
   [key: string]: string;
@@ -16,6 +17,8 @@ const SiteSettingsContext = createContext<SiteSettingsContextType | undefined>(u
 export const SiteSettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<SiteSettings>({});
   const [loading, setLoading] = useState(true);
+
+  useFavicon(settings.agency_logo);
 
   useEffect(() => {
     // Real-time sync for global settings

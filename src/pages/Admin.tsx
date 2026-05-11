@@ -14,6 +14,9 @@ import {
   LineChart, Line 
 } from 'recharts';
 import CMSManager from './CMSManager';
+import DetailedFinance from './DetailedFinance';
+import AdminOverview from './AdminOverview';
+import InvoiceGenerator from '../components/InvoiceGenerator';
 import ProjectAssetManager from '../components/ProjectAssetManager';
 import LeadNotifier from '../components/LeadNotifier';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -24,6 +27,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useSiteSettings } from '../lib/useSiteSettings';
 import { useFirestoreCollection, deleteFirestoreDoc, updateFirestoreDoc, addFirestoreDoc } from '../lib/cmsHooks';
 import { Modal, ClientForm, ProjectForm, InvoiceForm } from '../components/OperationalModals';
 
@@ -188,7 +192,7 @@ const formatDate = (val: any) => {
   return new Date(val).toLocaleDateString();
 };
 
-const ClientList = ({ clients, onEdit, onAdd }: { clients: any[], onEdit: (c: any) => void, onAdd: () => void }) => (
+const ClientList = ({ clients, onEdit, onAdd, onDelete }: { clients: any[], onEdit: (c: any) => void, onAdd: () => void, onDelete: (id: string) => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
     <TableHeader title="Gerenciamento de Clientes" results={clients.length} onAdd={onAdd} />
     <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
@@ -217,12 +221,20 @@ const ClientList = ({ clients, onEdit, onAdd }: { clients: any[], onEdit: (c: an
               </td>
               <td className="px-6 py-4 text-sm text-white/40">{formatDate(client.createdAt || client.created_at)}</td>
               <td className="px-6 py-4 text-right">
-                <button 
-                  onClick={() => onEdit(client)}
-                  className="text-white/20 hover:text-white transition-all text-xs border border-white/10 px-3 py-1 rounded"
-                >
-                  Editar
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button 
+                    onClick={() => onEdit(client)}
+                    className="text-white/20 hover:text-white transition-all text-xs border border-white/10 px-3 py-1 rounded"
+                  >
+                    Editar
+                  </button>
+                  <button 
+                    onClick={() => onDelete(client.id)}
+                    className="p-1.5 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -232,12 +244,18 @@ const ClientList = ({ clients, onEdit, onAdd }: { clients: any[], onEdit: (c: an
   </div>
 );
 
-const ProjectList = ({ projects, onEdit, onAdd, onManageAssets }: { projects: any[], onEdit: (p: any) => void, onAdd: () => void, onManageAssets: (p: any) => void }) => (
+const ProjectList = ({ projects, onEdit, onAdd, onDelete, onManageAssets }: { projects: any[], onEdit: (p: any) => void, onAdd: () => void, onDelete: (id: string) => void, onManageAssets: (p: any) => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
     <TableHeader title="Projetos" results={projects.length} onAdd={onAdd} />
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
       {projects.map((project) => (
-        <div key={project.id} className="bg-zinc-900 border border-white/5 p-6 rounded-2xl hover:border-white/20 transition-all flex flex-col">
+        <div key={project.id} className="bg-zinc-900 border border-white/5 p-6 rounded-2xl hover:border-white/20 transition-all flex flex-col group relative">
+          <button 
+            onClick={() => onDelete(project.id)}
+            className="absolute top-4 right-4 p-2 bg-red-500/10 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+          >
+            <Trash2 size={14} />
+          </button>
           <div className="flex justify-between items-start mb-4">
             <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold border ${
               project.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
@@ -274,9 +292,14 @@ const ProjectList = ({ projects, onEdit, onAdd, onManageAssets }: { projects: an
   </div>
 );
 
-const BillingList = ({ billing, onEdit, onAdd }: { billing: any[], onEdit: (b: any) => void, onAdd: () => void }) => (
+const BillingList = ({ billing, onEdit, onAdd, onDelete, onPreview }: { billing: any[], onEdit: (b: any) => void, onAdd: () => void, onDelete: (id: string) => void, onPreview: (b: any) => void }) => (
   <div className="p-8 animate-in fade-in duration-500">
-    <TableHeader title="Faturamento & Cobrança" results={billing.length} onAdd={onAdd} />
+    <div className="flex justify-between items-center mb-8">
+      <TableHeader title="Faturamento & Cobrança" results={billing.length} onAdd={onAdd} />
+      <Link to="/admin/financeiro-detalhado" className="px-6 py-2 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all flex items-center gap-2">
+        <TrendingUp size={14} /> Análise Detalhada
+      </Link>
+    </div>
     <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
       <table className="w-full text-left">
         <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
@@ -290,7 +313,7 @@ const BillingList = ({ billing, onEdit, onAdd }: { billing: any[], onEdit: (b: a
         </thead>
         <tbody className="divide-y divide-white/5">
           {billing.map((bill) => (
-            <tr key={bill.id} className="hover:bg-white/5 transition-all">
+            <tr key={bill.id} className="hover:bg-white/5 transition-all group">
               <td className="px-6 py-4 text-sm font-medium text-white">{bill.project_title}</td>
               <td className="px-6 py-4 text-sm font-bold text-white">R$ {bill.amount.toLocaleString()}</td>
               <td className="px-6 py-4 text-sm text-white/40">{new Date(bill.due_date).toLocaleDateString()}</td>
@@ -302,12 +325,26 @@ const BillingList = ({ billing, onEdit, onAdd }: { billing: any[], onEdit: (b: a
                 </span>
               </td>
               <td className="px-6 py-4 text-right">
-                <button 
-                  onClick={() => onEdit(bill)}
-                  className="text-white/60 hover:text-white transition-all rounded p-2 text-xs uppercase font-bold tracking-widest"
-                >
-                  Editar
-                </button>
+                <div className="flex justify-end gap-3">
+                  <button 
+                    onClick={() => onPreview(bill)}
+                    className="text-blue-500 hover:text-white transition-all text-[10px] uppercase font-bold border border-blue-500/20 px-3 py-1 rounded"
+                  >
+                    Preview
+                  </button>
+                  <button 
+                    onClick={() => onEdit(bill)}
+                    className="text-white/60 hover:text-white transition-all rounded p-2 text-xs uppercase font-bold tracking-widest"
+                  >
+                    Editar
+                  </button>
+                  <button 
+                    onClick={() => onDelete(bill.id)}
+                    className="p-2 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -398,34 +435,57 @@ const MessageList = () => {
 // --- Main Admin Wrapper ---
 
 export default function Admin() {
-  const { data: clients, loading: clientsLoading } = useFirestoreCollection<any>('clients');
-  const { data: projects, loading: projectsLoading } = useFirestoreCollection<any>('projects');
-  const { data: billing, loading: billingLoading } = useFirestoreCollection<any>('billing');
+  const { data: clients } = useFirestoreCollection<any>('clients');
+  const { data: projects } = useFirestoreCollection<any>('projects');
+  const { data: billing } = useFirestoreCollection<any>('billing');
+  const { data: posts } = useFirestoreCollection<any>('posts');
+  const { data: messages } = useFirestoreCollection<any>('messages', [orderBy('createdAt', 'desc')]);
+  const { data: activityLogs } = useFirestoreCollection<any>('activity_logs', [orderBy('timestamp', 'desc')]);
+  const { settings } = useSiteSettings();
 
   const [modalType, setModalType] = useState<'client' | 'project' | 'invoice' | null>(null);
   const [assetProject, setAssetProject] = useState<any>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<any>(null);
   const [editingData, setEditingData] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, collection: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const metrics = useMemo(() => {
     const paid = billing.filter(b => b.status === 'paid').reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
     const pending = billing.filter(b => b.status === 'unpaid').reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
     
-    // Simplistic chart data for demo
-    const chartData = [
-        { month: 'Jan', revenue: 0 },
-        { month: 'Feb', revenue: 0 },
-        { month: 'Mar', revenue: paid / 3 },
-    ];
+    // Group real billing by month
+    const monthlyData: { [key: string]: number } = {};
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
+    // Initialize current year months up to now
+    const currentMonth = new Date().getMonth();
+    for (let i = 0; i <= currentMonth; i++) {
+      monthlyData[months[i]] = 0;
+    }
+
+    billing.filter(b => b.status === 'paid').forEach(bill => {
+      const date = bill.createdAt?.seconds ? new Date(bill.createdAt.seconds * 1000) : new Date();
+      const monthName = months[date.getMonth()];
+      monthlyData[monthName] = (monthlyData[monthName] || 0) + (Number(bill.amount) || 0);
+    });
+
+    const chartData = Object.entries(monthlyData).map(([month, revenue]) => ({
+      month,
+      revenue
+    }));
     
     return {
       revenue: paid,
       pending,
       totalClients: clients.length,
       totalProjects: projects.length,
-      chartData
+      totalPosts: posts.length,
+      totalMessages: messages.length,
+      draftPosts: posts.filter(p => p.status !== 'published').length,
+      chartData: chartData.length > 0 ? chartData : [{ month: 'Jan', revenue: 0 }]
     };
-  }, [clients, projects, billing]);
+  }, [clients, projects, billing, posts, messages]);
 
   const handleSubmit = async (data: any) => {
     setLoading(true);
@@ -440,6 +500,32 @@ export default function Admin() {
         setEditingData(null);
     } catch (error) {
         console.error("Error saving data:", error);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setLoading(true);
+    try {
+        if (deleteConfirm.collection === 'clients') {
+            // Cascading delete: projects and invoices
+            const clientProjects = projects.filter(p => p.client_id === deleteConfirm.id);
+            const projectIds = clientProjects.map(p => p.id);
+            const clientBilling = billing.filter(b => projectIds.includes(b.project_id));
+
+            await Promise.all([
+                ...clientBilling.map(b => deleteFirestoreDoc('billing', b.id)),
+                ...clientProjects.map(p => deleteFirestoreDoc('projects', p.id)),
+                deleteFirestoreDoc('clients', deleteConfirm.id)
+            ]);
+        } else {
+            await deleteFirestoreDoc(deleteConfirm.collection, deleteConfirm.id);
+        }
+        setDeleteConfirm(null);
+    } catch (e) {
+        console.error("Delete error:", e);
     } finally {
         setLoading(false);
     }
@@ -486,16 +572,44 @@ export default function Admin() {
             {modalType === 'invoice' && <InvoiceForm initialData={editingData} projects={projects} onSubmit={handleSubmit} loading={loading} />}
         </Modal>
 
+        <ConfirmationModal 
+            isOpen={!!deleteConfirm}
+            onClose={() => setDeleteConfirm(null)}
+            onConfirm={handleConfirmDelete}
+            title={`Excluir ${deleteConfirm?.collection === 'clients' ? 'Cliente' : 'Item'}`}
+            message={deleteConfirm?.collection === 'clients' 
+                ? "Deseja realmente excluir este cliente? Isso removerá permanentemente todos os projetos e faturas vinculados a ele."
+                : "Deseja realmente remover este item? Esta ação não pode ser revertida."
+            }
+            confirmText="Excluir"
+        />
+
         <Routes>
-          <Route index element={<Dashboard metrics={metrics} />} />
+          <Route index element={
+            <AdminOverview 
+                metrics={metrics} 
+                recentMessages={messages.slice(0, 3)} 
+                recentLogs={activityLogs.slice(0, 5)}
+                onQuickAction={(type) => setModalType(type)} 
+            />
+          } />
           <Route path="cms" element={<CMSManager />} />
           <Route path="mensagens" element={<MessageList />} />
-          <Route path="clientes" element={<ClientList clients={clients} onAdd={() => setModalType('client')} onEdit={(c) => { setEditingData(c); setModalType('client'); }} />} />
-          <Route path="projetos" element={<ProjectList projects={projects} onAdd={() => setModalType('project')} onEdit={(p) => { setEditingData(p); setModalType('project'); }} onManageAssets={(p) => setAssetProject(p)} />} />
-          <Route path="financeiro" element={<BillingList billing={billing} onAdd={() => setModalType('invoice')} onEdit={(b) => { setEditingData(b); setModalType('invoice'); }} />} />
+          <Route path="clientes" element={<ClientList clients={clients} onAdd={() => setModalType('client')} onEdit={(c) => { setEditingData(c); setModalType('client'); }} onDelete={(id) => setDeleteConfirm({ id, collection: 'clients' })} />} />
+          <Route path="projetos" element={<ProjectList projects={projects} onAdd={() => setModalType('project')} onEdit={(p) => { setEditingData(p); setModalType('project'); }} onDelete={(id) => setDeleteConfirm({ id, collection: 'projects' })} onManageAssets={(p) => setAssetProject(p)} />} />
+          <Route path="financeiro" element={<BillingList billing={billing} onAdd={() => setModalType('invoice')} onEdit={(b) => { setEditingData(b); setModalType('invoice'); }} onDelete={(id) => setDeleteConfirm({ id, collection: 'billing' })} onPreview={(b) => setPreviewInvoice(b)} />} />
+          <Route path="financeiro-detalhado" element={<DetailedFinance />} />
         </Routes>
 
         <LeadNotifier />
+
+        {previewInvoice && (
+          <InvoiceGenerator 
+            invoice={previewInvoice} 
+            agencySettings={settings} 
+            onClose={() => setPreviewInvoice(null)} 
+          />
+        )}
 
         {assetProject && (
           <ProjectAssetManager 

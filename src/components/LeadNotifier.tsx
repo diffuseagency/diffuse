@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, where, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Bell, BellRing, Volume2, X } from 'lucide-react';
+import { Bell, BellRing, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function LeadNotifier() {
   const [newLead, setNewLead] = useState<any>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [hasPermission, setHasPermission] = useState(false);
   const lastLeadId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -38,15 +36,10 @@ export default function LeadNotifier() {
 
   const handleNewLead = (lead: any) => {
     setNewLead(lead);
-    if (audioRef.current && hasPermission) {
-      audioRef.current.play().catch(e => console.log("Audio play blocked", e));
-    }
   };
 
   return (
     <>
-      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto" />
-      
       <AnimatePresence>
         {newLead && (
           <motion.div 
@@ -90,16 +83,6 @@ export default function LeadNotifier() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {!hasPermission && (
-          <button 
-            onClick={() => setHasPermission(true)}
-            className="fixed bottom-4 right-4 p-3 bg-white/5 rounded-full text-white/20 hover:text-white transition-all z-[150] border border-white/10 group"
-            title="Ativar Notificações Sonoras"
-          >
-             <Volume2 size={16} className={hasPermission ? 'text-blue-500' : ''} />
-          </button>
-      )}
     </>
   );
 }
