@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutGrid, Users, Briefcase, CreditCard, Menu, X, ArrowRight, Shield, Cpu, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -24,6 +24,8 @@ import ProjectDetails from './pages/ProjectDetails';
 import ProjectDetailPublic from './pages/ProjectDetailPublic';
 import BlogPreview from './pages/BlogPreview';
 import Maintenance from './pages/Maintenance';
+import ClientDashboard from './pages/ClientDashboard';
+import NotFound from './pages/NotFound';
 import AdminGuard from './components/AdminGuard';
 import PublicRouteGuard from './components/PublicRouteGuard';
 import Footer from './components/Footer';
@@ -32,15 +34,16 @@ import SEO from './components/SEO';
 
 import { HelmetProvider } from 'react-helmet-async';
 import { SiteSettingsProvider, useSiteSettings } from './lib/useSiteSettings';
+import { useFavicon } from './lib/useFavicon';
+import { AuthProvider, useAuth } from './lib/AuthContext';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 
 const Navbar = () => {
   const { settings } = useSiteSettings();
+  const { user, isUserAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [navLinks, setNavLinks] = useState<any[]>([]);
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith('/admin');
@@ -67,23 +70,8 @@ const Navbar = () => {
       }
     });
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        try {
-          const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
-          setIsUserAdmin(adminDoc.exists());
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-          setIsUserAdmin(false);
-        }
-      } else {
-        setIsUserAdmin(false);
-      }
-    });
     return () => {
       unsubscribeNav();
-      unsubscribeAuth();
     };
   }, []);
 
@@ -138,9 +126,18 @@ const Navbar = () => {
                       location.pathname.startsWith('/admin') ? "text-blue-400" : ""
                     )}
                   >
-                    Dashboard
+                    Admin
                   </Link>
                 )}
+                <Link
+                  to="/dashboard"
+                  className={cn(
+                    "hover:text-white transition-colors uppercase",
+                    location.pathname === '/dashboard' ? "text-white border-b border-blue-400 pb-1" : "text-gray-400"
+                  )}
+                >
+                  Dashboard
+                </Link>
                 <Link
                   to="/profile"
                   className={cn(
@@ -200,9 +197,16 @@ const Navbar = () => {
                       onClick={() => setIsOpen(false)}
                       className="block text-blue-400 hover:text-blue-300 text-lg font-bold tracking-wide py-2 uppercase"
                     >
-                      Dashboard Master
+                      Admin Panel
                     </Link>
                   )}
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setIsOpen(false)}
+                    className="block text-white/80 hover:text-white text-lg font-light tracking-wide py-2"
+                  >
+                    Dashboard
+                  </Link>
                   <Link
                     to="/profile"
                     onClick={() => setIsOpen(false)}
@@ -220,13 +224,6 @@ const Navbar = () => {
                   Login
                 </Link>
               )}
-              <Link
-                to="/admin"
-                onClick={() => setIsOpen(false)}
-                className="block text-center text-white/40 hover:text-white py-2 text-xs font-bold uppercase tracking-widest"
-              >
-                Admin Area
-              </Link>
             </div>
           </motion.div>
         )}
@@ -238,12 +235,14 @@ const Navbar = () => {
 export default function App() {
   return (
     <HelmetProvider>
-      <SiteSettingsProvider>
-        <Router basename={import.meta.env.BASE_URL}>
-          <SEO />
-          <AppContent />
-        </Router>
-      </SiteSettingsProvider>
+      <AuthProvider>
+        <SiteSettingsProvider>
+          <Router>
+            <SEO />
+            <AppContent />
+          </Router>
+        </SiteSettingsProvider>
+      </AuthProvider>
     </HelmetProvider>
   );
 }
@@ -252,26 +251,8 @@ function AppContent() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   const { settings, loading: settingsLoading } = useSiteSettings();
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        try {
-          const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
-          setIsUserAdmin(adminDoc.exists());
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-          setIsUserAdmin(false);
-        }
-      } else {
-        setIsUserAdmin(false);
-      }
-      setAuthLoading(false);
-    });
-    return () => unsubscribeAuth();
-  }, []);
+  const { isUserAdmin, loading: authLoading } = useAuth();
+  useFavicon();
 
   const isMaintenanceMode = settings.is_maintenance_mode === 'true';
   const showMaintenance = isMaintenanceMode && !isUserAdmin && !isAdmin && location.pathname !== '/login';
@@ -319,8 +300,16 @@ function AppContent() {
               </PublicRouteGuard>
             } />
             <Route path="/portfolio/:slug" element={<ProjectDetailPublic />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/blog" element={
+              <PublicRouteGuard path="/blog">
+                <Blog />
+              </PublicRouteGuard>
+            } />
+            <Route path="/blog/:slug" element={
+              <PublicRouteGuard path="/blog">
+                <BlogPost />
+              </PublicRouteGuard>
+            } />
             <Route path="/admin/preview/:slug" element={
               <AdminGuard>
                 <BlogPreview />
@@ -333,6 +322,7 @@ function AppContent() {
             } />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/dashboard" element={<ClientDashboard />} />
             <Route path="/project/:id" element={<ProjectDetails />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/admin/*" element={
@@ -340,8 +330,8 @@ function AppContent() {
                 <Admin />
               </AdminGuard>
             } />
-            {/* Catch-all route to prevent navigation errors */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Catch-all route for custom 404 */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
         {!isAdmin && <Footer />}

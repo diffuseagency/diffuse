@@ -21,12 +21,13 @@ function cn(...inputs: ClassValue[]) {
 import { addFirestoreDoc, updateFirestoreDoc, deleteFirestoreDoc } from '../lib/cmsHooks';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MediaLibrary from '../components/MediaLibrary';
+import SEOPreview from '../components/SEOPreview';
 import ReactMarkdown from 'react-markdown';
 
 const iconMap = { Globe, Smartphone, Search, Database, Code2, Rocket, Layout };
 
 export default function CMSManager() {
-  const [activeTab, setActiveTab] = useState<'settings' | 'services' | 'portfolio' | 'testimonials' | 'contact' | 'footer' | 'institucional' | 'navigation' | 'media' | 'posts' | 'admins'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'services' | 'portfolio' | 'testimonials' | 'contact' | 'footer' | 'institucional' | 'navigation' | 'media' | 'posts' | 'admins' | 'authors'>('settings');
   const [navFilter, setNavFilter] = useState<'header' | 'footer' | 'legal'>('header');
   const [showMediaPicker, setShowMediaPicker] = useState<{ isOpen: boolean, targetField: string } | null>(null);
   const [settings, setSettings] = useState<any>({});
@@ -36,6 +37,7 @@ export default function CMSManager() {
   const [navigation, setNavigation] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
+  const [authors, setAuthors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [previewMarkdown, setPreviewMarkdown] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -52,14 +54,15 @@ export default function CMSManager() {
 
   const fetchData = async () => {
     try {
-        const [settingsSnap, servicesSnap, portfolioSnap, testimonialsSnap, navigationSnap, postsSnap, adminsSnap] = await Promise.all([
+        const [settingsSnap, servicesSnap, portfolioSnap, testimonialsSnap, navigationSnap, postsSnap, adminsSnap, authorsSnap] = await Promise.all([
             getDocs(collection(db, 'settings')),
             getDocs(collection(db, 'services')),
             getDocs(collection(db, 'portfolio')),
             getDocs(collection(db, 'testimonials')),
             getDocs(collection(db, 'navigation')),
             getDocs(collection(db, 'posts')),
-            getDocs(collection(db, 'admins'))
+            getDocs(collection(db, 'admins')),
+            getDocs(collection(db, 'authors'))
         ]);
         const sData: any = {};
         settingsSnap.docs.forEach(d => sData[d.data().key] = d.data().value);
@@ -70,6 +73,7 @@ export default function CMSManager() {
         setNavigation(navigationSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
         setPosts(postsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAdmins(adminsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAuthors(authorsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
         handleFirestoreError(e, OperationType.LIST, 'multiple collections');
     }
@@ -280,6 +284,11 @@ export default function CMSManager() {
                         data.tags = data.tags.split(',').map((f: any) => f.trim()).filter((f: any) => f !== '');
                     }
 
+                    // Process scheduledAt if it's a post and has a date
+                    if (activeTab === 'posts' && data.date) {
+                        data.scheduledAt = new Date(data.date + 'T00:00:00');
+                    }
+
                     // Process gallery if it's a portfolio item
                     if (activeTab === 'portfolio' && typeof data.gallery === 'string') {
                         data.gallery = data.gallery.split('\n').map((f: any) => f.trim()).filter((f: any) => f !== '');
@@ -454,9 +463,24 @@ export default function CMSManager() {
                                     <input name="og_image" defaultValue={editingItem?.og_image} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">OG Description (SEO)</label>
-                                <textarea name="og_description" defaultValue={editingItem?.og_description} rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            
+                            <div className="pt-4 border-t border-white/5 space-y-6">
+                              <SEOPreview 
+                                title={editingItem?.title || ''} 
+                                description={editingItem?.og_description || editingItem?.full_description || ''} 
+                                slug={`portfolio/${editingItem?.slug || ''}`} 
+                              />
+
+                              <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-500 uppercase">OG Description (SEO)</label>
+                                  <textarea 
+                                    name="og_description" 
+                                    value={editingItem?.og_description || ''} 
+                                    onChange={(e) => setEditingItem({ ...editingItem, og_description: e.target.value })}
+                                    rows={2} 
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 transition-all outline-none" 
+                                  />
+                              </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -579,8 +603,21 @@ export default function CMSManager() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase">OG Description (SEO)</label>
-                                    <input name="og_description" defaultValue={editingItem?.og_description} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                    <input 
+                                      name="og_description" 
+                                      value={editingItem?.og_description || ''} 
+                                      onChange={(e) => setEditingItem({ ...editingItem, og_description: e.target.value })}
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-500 transition-all outline-none" 
+                                    />
                                 </div>
+                            </div>
+
+                            <div className="py-6 border-y border-white/5">
+                              <SEOPreview 
+                                title={editingItem?.title || ''} 
+                                description={editingItem?.og_description || editingItem?.excerpt || ''} 
+                                slug={`journal/${editingItem?.slug || ''}`} 
+                              />
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
@@ -613,7 +650,12 @@ export default function CMSManager() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase">Autor</label>
-                                    <input name="author" defaultValue={editingItem?.author} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                                    <select name="authorId" defaultValue={editingItem?.authorId} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
+                                        <option value="">Selecionar Autor...</option>
+                                        {authors.map(author => (
+                                          <option key={author.id} value={author.id}>{author.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase">Tags (Separadas por vírgula)</label>
@@ -625,6 +667,36 @@ export default function CMSManager() {
                                 <input type="date" name="date" defaultValue={editingItem?.date || new Date().toISOString().split('T')[0]} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
                             </div>
                         </div>
+                    )}
+                    {activeTab === 'authors' && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Avatar (URL)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        name="photoURL" 
+                                        value={editingItem?.photoURL || ''} 
+                                        onChange={e => setEditingItem({...editingItem, photoURL: e.target.value})}
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowMediaPicker({ isOpen: true, targetField: 'photoURL' })}
+                                        className="px-4 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white"
+                                    >
+                                        <ImageIcon size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Nome Completo</label>
+                                <input name="name" defaultValue={editingItem?.name} required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Biografia Curta</label>
+                                <textarea name="bio" defaultValue={editingItem?.bio} rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
+                            </div>
+                        </>
                     )}
                     {activeTab === 'admins' && (
                         <>
@@ -692,6 +764,7 @@ export default function CMSManager() {
             { id: 'testimonials', label: 'Depoimentos', icon: Star },
             { id: 'footer', label: 'Rodapé', icon: Layout },
             { id: 'posts', label: 'Blog', icon: MessageSquare },
+            { id: 'authors', label: 'Autores', icon: Users },
             { id: 'admins', label: 'Acessos', icon: Database },
           ].map(tab => (
             <button
@@ -762,6 +835,40 @@ export default function CMSManager() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'authors' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+              <div>
+                <h3 className="text-white font-bold text-sm">Gerenciar Autores</h3>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Escritores do Journal</p>
+              </div>
+              <button onClick={openCreateModal} className="flex items-center gap-2 px-6 py-3 bg-blue-500/10 border border-blue-500/30 text-blue-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all shadow-lg shadow-blue-500/10">
+                <Plus size={14} /> Novo Autor
+              </button>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {authors.map(author => (
+                <div key={author.id} className="p-6 bg-white/5 border border-white/5 rounded-3xl group flex flex-col items-center text-center">
+                  <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-2 border-white/10 group-hover:border-blue-500/50 transition-all">
+                    <img src={author.photoURL || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
+                  </div>
+                  <h4 className="text-white font-bold text-lg">{author.name}</h4>
+                  <p className="text-gray-500 text-xs mt-2 line-clamp-3">{author.bio}</p>
+                  <div className="flex justify-center gap-2 pt-6 mt-auto w-full border-t border-white/5">
+                    <button onClick={() => openEditModal(author)} className="p-2 text-gray-500 hover:text-white transition-all"><Edit3 size={16} /></button>
+                    <button onClick={() => handleDelete('authors', author.id)} className="p-2 text-red-500/40 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+              {authors.length === 0 && (
+                <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[40px]">
+                  <p className="text-gray-500 text-[10px] uppercase tracking-widest">Nenhum autor cadastrado ainda.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

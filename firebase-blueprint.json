@@ -112,6 +112,18 @@
         "budget": { "type": "number" },
         "deadline": { "type": "string", "format": "date" },
         "current_step": { "type": "number" },
+        "timeline": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "date": { "type": "string", "format": "date" },
+              "completed": { "type": "boolean" },
+              "description": { "type": "string" }
+            }
+          }
+        },
         "assets": { 
           "type": "array", 
           "items": { 
@@ -136,12 +148,14 @@
       "type": "object",
       "properties": {
         "project_id": { "type": "string" },
+        "client_email": { "type": "string", "format": "email" },
+        "description": { "type": "string" },
         "amount": { "type": "number" },
-        "status": { "type": "string", "enum": ["paid", "unpaid"] },
+        "status": { "type": "string", "enum": ["paid", "unpaid", "overdue"] },
         "dueDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["projectId", "amount"]
+      "required": ["project_id", "amount", "client_email"]
     },
     "Message": {
       "title": "Message",

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
 import { clsx, type ClassValue } from 'clsx';
@@ -28,7 +29,7 @@ export default function Portfolio() {
         const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         setProjects(items);
       } catch (error) {
-        console.error("Error fetching portfolio:", error);
+        handleFirestoreError(error, OperationType.LIST, 'portfolio');
       } finally {
         setLoading(false);
       }

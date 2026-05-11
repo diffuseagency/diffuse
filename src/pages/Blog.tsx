@@ -3,10 +3,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
-import { Calendar, User, ArrowRight, Loader2, Search } from 'lucide-react';
+import { Calendar, User, ArrowRight, Search, Tag } from 'lucide-react';
 import { cn } from '../lib/utils';
+import Skeleton from '../components/ui/Skeleton';
 
 export default function Blog() {
   const { settings } = useSiteSettings();
@@ -19,17 +21,19 @@ export default function Blog() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
+        const today = new Date().toISOString().split('T')[0];
         const q = query(
           collection(db, 'posts'),
           where('status', '==', 'published'),
+          where('date', '<=', today),
           orderBy('date', 'desc')
         );
         const snap = await getDocs(q);
         setPosts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
-        console.error("Error fetching posts:", error);
+        handleFirestoreError(error, OperationType.LIST, 'posts');
       } finally {
-        setLoading(false);
+        setTimeout(() => setLoading(false), 800); // Small delay for smooth transition
       }
     };
     fetchPosts();
@@ -52,14 +56,6 @@ export default function Blog() {
   const pagedPosts = useMemo(() => {
     return filteredPosts.slice(0, visibleCount);
   }, [filteredPosts, visibleCount]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-brand-bg">
-        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="pt-40 pb-20 px-4 max-w-7xl mx-auto">
@@ -86,95 +82,119 @@ export default function Blog() {
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-8 scrollbar-hide border-b border-white/5 mb-12">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => { setActiveCategory(cat); setVisibleCount(6); }}
-            className={cn(
-              "px-6 py-2 rounded-full text-[10px] uppercase tracking-widest transition-all whitespace-nowrap border",
-              activeCategory === cat 
-                ? "bg-white text-black border-white" 
-                : "bg-white/5 text-gray-500 border-white/5 hover:border-white/20"
-            )}
-          >
-            {cat}
-          </button>
-        ))}
+        {loading ? (
+             [1, 2, 3, 4].map(i => <Skeleton key={i} className="w-24 h-10 rounded-full" />)
+        ) : (
+            categories.map(cat => (
+                <button
+                    key={cat}
+                    onClick={() => { setActiveCategory(cat); setVisibleCount(6); }}
+                    className={cn(
+                    "px-6 py-2 rounded-full text-[10px] uppercase tracking-widest transition-all whitespace-nowrap border",
+                    activeCategory === cat 
+                        ? "bg-white text-black border-white" 
+                        : "bg-white/5 text-gray-500 border-white/5 hover:border-white/20"
+                    )}
+                >
+                    {cat}
+                </button>
+            ))
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-6 mb-20">
-        {pagedPosts.length === 0 ? (
-          <div className="col-span-full py-40 text-center border-2 border-dashed border-white/5 rounded-[40px]">
-             <Search size={40} className="mx-auto text-gray-700 mb-4" />
-             <p className="text-gray-500 uppercase tracking-widest text-[10px]">Nenhuma correspondência encontrada.</p>
-          </div>
+        {loading ? (
+           [1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className={cn(
+                "rounded-[40px] bg-white/[0.02] border border-white/5 p-10 h-[400px]",
+                i === 1 ? "md:col-span-6 lg:col-span-8 lg:row-span-2 h-[800px]" : 
+                i === 3 ? "md:col-span-6 lg:col-span-6" :
+                i === 5 ? "md:col-span-3 lg:col-span-4 lg:row-span-2 h-[800px]" :
+                "md:col-span-3 lg:col-span-4"
+            )}>
+              <Skeleton className="w-20 h-4 mb-4" />
+              <Skeleton className="w-full h-12 mb-6" />
+              <Skeleton className="w-full h-24 mb-8" />
+              <div className="mt-auto flex justify-between items-center">
+                 <Skeleton className="w-32 h-6" />
+                 <Skeleton className="w-10 h-10 rounded-full" />
+              </div>
+            </div>
+           ))
         ) : (
-          pagedPosts.map((post, idx) => {
-            // Bento logic: first post is large, some are wide, some are tall
-            const isFirst = idx === 0;
-            const isWide = idx % 5 === 2;
-            const isTall = idx % 5 === 4;
+            pagedPosts.length === 0 ? (
+            <div className="col-span-full py-40 text-center border-2 border-dashed border-white/5 rounded-[40px]">
+                <Search size={40} className="mx-auto text-gray-700 mb-4" />
+                <p className="text-gray-500 uppercase tracking-widest text-[10px]">Nenhuma correspondência encontrada.</p>
+            </div>
+            ) : (
+            pagedPosts.map((post, idx) => {
+                // Bento logic: first post is large, some are wide, some are tall
+                const isFirst = idx === 0;
+                const isWide = idx % 5 === 2;
+                const isTall = idx % 5 === 4;
 
-            return (
-              <motion.div
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className={cn(
-                  "group relative overflow-hidden rounded-[40px] bg-white/[0.02] border border-white/5 hover:border-blue-500/30 transition-all duration-500",
-                  isFirst ? "md:col-span-6 lg:col-span-8 lg:row-span-2" : 
-                  isWide ? "md:col-span-6 lg:col-span-6" :
-                  isTall ? "md:col-span-3 lg:col-span-4 lg:row-span-2" :
-                  "md:col-span-3 lg:col-span-4"
-                )}
-              >
-                <Link to={`/blog/${post.slug}`} className="absolute inset-0 z-20" />
-                
-                <div className="absolute inset-0 z-0">
-                  <img 
-                    src={post.featuredImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80'} 
-                    alt={post.title}
-                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 opacity-20 group-hover:opacity-40"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent" />
-                </div>
-
-                <div className="relative z-10 p-10 h-full flex flex-col justify-end">
-                  <div className="flex gap-4 mb-4">
-                    <span className="text-[8px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-widest">
-                      {post.category}
-                    </span>
-                    <span className="text-[8px] text-white/40 uppercase tracking-widest flex items-center gap-1 font-mono">
-                      <Calendar size={10} /> {post.date}
-                    </span>
-                  </div>
-                  
-                  <h3 className={cn(
-                    "font-display tracking-tighter text-white mb-4 transition-all group-hover:text-blue-400",
-                    isFirst ? "text-4xl md:text-6xl" : "text-2xl"
-                  )}>
-                    {post.title}
-                  </h3>
-                  
-                  <p className="text-gray-500 text-sm line-clamp-2 font-light leading-relaxed mb-6 group-hover:text-gray-300 transition-colors">
-                    {post.excerpt}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                       <User size={12} className="text-blue-500" />
-                       <span className="text-[10px] uppercase font-bold tracking-widest text-white/60">{post.author}</span>
+                return (
+                <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.1 }}
+                    className={cn(
+                    "group relative overflow-hidden rounded-[40px] bg-white/[0.02] border border-white/5 hover:border-blue-500/30 transition-all duration-500",
+                    isFirst ? "md:col-span-6 lg:col-span-8 lg:row-span-2" : 
+                    isWide ? "md:col-span-6 lg:col-span-6" :
+                    isTall ? "md:col-span-3 lg:col-span-4 lg:row-span-2" :
+                    "md:col-span-3 lg:col-span-4"
+                    )}
+                >
+                    <Link to={`/blog/${post.slug}`} className="absolute inset-0 z-20" />
+                    
+                    <div className="absolute inset-0 z-0">
+                    <img 
+                        src={post.featuredImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80'} 
+                        alt={post.title}
+                        className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 opacity-20 group-hover:opacity-40"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent" />
                     </div>
-                    <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center -translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
-                      <ArrowRight size={14} className="text-white" />
+
+                    <div className="relative z-10 p-10 h-full flex flex-col justify-end">
+                    <div className="flex gap-4 mb-4">
+                        <span className="text-[8px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-widest">
+                        {post.category}
+                        </span>
+                        <span className="text-[8px] text-white/40 uppercase tracking-widest flex items-center gap-1 font-mono">
+                        <Calendar size={10} /> {post.date}
+                        </span>
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })
+                    
+                    <h3 className={cn(
+                        "font-display tracking-tighter text-white mb-4 transition-all group-hover:text-blue-400",
+                        isFirst ? "text-4xl md:text-6xl" : "text-2xl"
+                    )}>
+                        {post.title}
+                    </h3>
+                    
+                    <p className="text-gray-500 text-sm line-clamp-2 font-light leading-relaxed mb-6 group-hover:text-gray-300 transition-colors">
+                        {post.excerpt}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                        <User size={12} className="text-blue-500" />
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-white/60">{post.author}</span>
+                        </div>
+                        <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center -translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
+                        <ArrowRight size={14} className="text-white" />
+                        </div>
+                    </div>
+                    </div>
+                </motion.div>
+                );
+            })
+            )
         )}
       </div>
 

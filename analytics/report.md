@@ -1,30 +1,36 @@
-# Relatório de Análise e Auditoria do Sistema (Status: PENDENTE)
-**Data de Geração:** 11/05/2026 - 08:48:57 (Horário de Brasília)
+# Relatório de Análise Geral - Sistema DIFFUSE
+**Data/Hora (Brasília):** 11/05/2026 13:30
 
-## Análise Geral
-O sistema DIFFUSE encontra-se em um estado avançado de funcionalidade, com um núcleo robusto de CMS e CRM. No entanto, para atingir o nível "Sênior Product" e atender às expectativas de uma agência de alto valor, alguns refinamentos e novas camadas de funcionalidade são necessários.
+## 1. Visão Geral do Sistema
+O sistema encontra-se em um estágio avançado de maturidade, com as fundações de Core (Firebase/React/Vite), Administração (CMS/Gestão de Projetos) e Experiência do Cliente (Dashboard/Chat) plenamente funcionais. A arquitetura segue padrões modernos de design e performance.
 
-## Itens Faltantes e Pendências (Roadmap para Finalização)
+## 2. O que falta terminar (Pendências Identificadas)
 
-### 1. Inteligência de Dados (Analytics)
-- **Cálculo Real de Receita:** O `AdminOverview` atualmente utiliza multiplicadores estáticos para simular o gráfico de faturamento. É necessário implementar a agregação real por mês baseada na coleção `billing`.
-- **KPIs de Conversão:** Não há rastreio de taxa de conversão (mensagens enviadas / acessos).
+### [A] Robustez e Segurança (Infraestrutura)
+1.  **Cobertura de Error Handling:** Nem todas as transações do Firestore no `CMSManager.tsx` e `Admin.tsx` estão utilizando o `handleFirestoreError` com o wrapper de informação detalhada necessário para telemetria de erros de permissão.
+2.  **Navigation Guards Dinâmicos:** Embora o `PublicRouteGuard` exista, a lógica de bloqueio de rotas com base no campo `isActive` da coleção `navigation` precisa ser aplicada de forma mais rigorosa no `App.tsx` para todas as rotas públicas (Blog, Serviços, Portfólio).
 
-### 2. Experiência do Cliente (CRM Full)
-- **Área do Cliente Centralizada:** No momento, os clientes acessam projetos individualmente. Falta uma "Home do Cliente" onde ele visualize o histórico completo de faturas, ativos e projetos.
-- **Notificações em Tempo Real:** Implementar alertas visuais no dashboard administrativo quando novas mensagens ou pagamentos forem detectados.
+### [B] SEO e Branding
+1.  **Dynamic Favicon:** Implementação do hook `useFavicon` para sincronizar o ícone da aba com o logo enviado no `CMSManager` (atualmente fixo no `index.html`).
+2.  **Breadcrumbs Dinâmicos:** Padronização do componente `Breadcrumbs` em todas as subpáginas (algumas páginas ainda usam navegação manual simples).
 
-### 3. Gestão de Conteúdo (CMS Pro)
-- **Logs de Atividade (Audit Trail):** Registro de "quem alterou o quê" para auditoria interna.
-- **Otimização de SEO Individual:** No CMS, adicionar campos de Meta Tags específicos para cada post do blog e trabalho do portfólio.
+### [C] Funcionalidades de Conteúdo (Blog/Journal)
+1.  **Pesquisa no Blog:** Implementação de um campo de busca/filtro por tags/categorias funcional na página `Blog.tsx` (atualmente a UI existe mas a lógica de filtro Firestore é parcial).
+2.  **Social Share:** Finalização dos botões de compartilhamento social na página `BlogPost.tsx` (atualmente são placeholders visuais).
 
-### 4. Componentes Públicos e UX
-- **Newsletter Engine:** Captura de e-mails no footer e gerenciamento/exportação desses leads no Admin.
-- **Portfólio Imersivo:** Otimização do componente `ProjectDetailPublic` para incluir seções de "Resultados" (Outcome) e "Pilha Tecnológica" (Tech Stack) de forma visualmente mais agressiva e sintonizada com o design bento.
+### [D] Gestão e Business Intelligence
+1.  **Notificações de Email:** Implementação de triggers (via Firebase Functions ou serviço externo) para os eventos de:
+    *   Nova Mensagem no Chat (Admin e Cliente).
+    *   Novo Lead de Newsletter.
+    *   Aprovação/Rejeição de Asset.
+2.  **Deduplicação de Leads:** Lógica para evitar múltiplos registros do mesmo e-mail na coleção `newsletter_leads`.
 
-### 5. Configurações Globais
-- **Internacionalização (i18n):** Estrutura para suporte a múltiplos idiomas (PT-BR / EN-US), essencial para agências globais.
-- **Modo de Manutenção:** Toggle nas configurações para ativar tela de manutenção pública.
+### [E] Polimento de UI/UX
+1.  **Página 404 Customizada:** Atualmente o sistema usa um fallback simples; necessário uma página 404 alinhada ao design premium da agência.
+2.  **Skeleton Screens:** Implementação de loaders mais suaves (Skeletons) nas transições de rotas onde o `onSnapshot` ou `getDocs` causa "flicker" de layout.
+
+## 3. Conclusão
+O sistema está ~90% concluído em termos de funcionalidades core. As pendências restantes são focadas em **Qualidade de Vida (QoL)**, **SEO Avançado** e **Fechamento de Ciclo de Automação (Emails)**.
 
 ---
-**Conclusão da Análise:** O sistema é estável, mas "estático" em termos de inteligência de dados e tracking de atividades. A finalização deve focar em transformar os dados brutos em insights e em fechar o ciclo de vida do cliente dentro da plataforma.
+*Gerado automaticamente pela Engenharia de Sistemas (DIFFUSE).*

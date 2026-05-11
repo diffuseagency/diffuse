@@ -3,6 +3,7 @@ import { Layout, Smartphone, Globe, Code2, Rocket, Search, Database } from 'luci
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
 
@@ -41,8 +42,12 @@ export default function Services() {
 
   useEffect(() => {
     const fetchServices = async () => {
-      const snap = await getDocs(collection(db, 'services'));
-      setServices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      try {
+        const snap = await getDocs(collection(db, 'services'));
+        setServices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'services');
+      }
     };
     fetchServices();
   }, []);

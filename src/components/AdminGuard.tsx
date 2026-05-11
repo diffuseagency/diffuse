@@ -1,38 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { useAuth } from '../lib/AuthContext';
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Super admin email bypass (emergency)
-        if (user.email === 'diffuseagency@gmail.com') {
-          setAuthorized(true);
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const docRef = doc(db, 'admins', user.uid);
-          const docSnap = await getDoc(docRef);
-          setAuthorized(docSnap.exists());
-        } catch (error) {
-          console.error("Admin verification error:", error);
-          setAuthorized(false);
-        }
-      } else {
-        setAuthorized(false);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  const { isUserAdmin, loading } = useAuth();
 
   if (loading) {
     return (
@@ -45,7 +16,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     );
   }
   
-  if (!authorized) {
+  if (!isUserAdmin) {
     return <Navigate to="/login" replace />;
   }
   

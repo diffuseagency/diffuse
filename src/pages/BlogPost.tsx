@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { motion } from 'motion/react';
-import { ArrowLeft, Loader2, Calendar, User, Tag, Share2, Clock } from 'lucide-react';
+import { ArrowLeft, Loader2, Calendar, User, Tag, Share2, Clock, Linkedin } from 'lucide-react';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
+import Breadcrumbs from '../components/Breadcrumbs';
 import ReactMarkdown from 'react-markdown';
 
 export default function BlogPost() {
@@ -28,7 +30,7 @@ export default function BlogPost() {
           setPost({ id: snap.docs[0].id, ...snap.docs[0].data() });
         }
       } catch (error) {
-        console.error("Error fetching post:", error);
+        handleFirestoreError(error, OperationType.GET, `posts/${slug}`);
       } finally {
         setLoading(false);
       }
@@ -58,10 +60,12 @@ export default function BlogPost() {
   return (
     <div className="bg-brand-bg min-h-screen pb-20">
       <SEO 
-        title={`${post.title} | Journal | ${settings.agency_name || 'Diffuse'}`}
-        description={post.excerpt}
-        image={post.featuredImage}
+        title={post.title}
+        description={post.og_description || post.excerpt}
+        image={post.og_image || post.featuredImage}
         article={true}
+        authorName={post.author}
+        publishedTime={post.date}
       />
 
       {/* Hero Header */}
@@ -72,10 +76,12 @@ export default function BlogPost() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <Link to="/blog" className="inline-flex items-center gap-2 text-white/40 hover:text-white transition-colors mb-12 group">
-              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              <span className="text-[10px] uppercase tracking-[0.4em]">Journal</span>
-            </Link>
+            <Breadcrumbs 
+              items={[
+                { label: 'Journal', path: '/blog' },
+                { label: post.title }
+              ]} 
+            />
 
             <div className="flex flex-wrap items-center gap-6 mb-8">
               <span className="px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full text-[10px] font-bold uppercase tracking-widest">
@@ -103,9 +109,27 @@ export default function BlogPost() {
                   <p className="text-white font-medium">{post.author}</p>
                 </div>
               </div>
-              <button className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
-                <Share2 size={18} />
-              </button>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    alert('Link copiado!');
+                  }}
+                  className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                  title="Copiar Link"
+                >
+                  <Share2 size={18} />
+                </button>
+                <a 
+                  href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                  title="Compartilhar no LinkedIn"
+                >
+                  <Linkedin size={18} />
+                </a>
+              </div>
             </div>
           </motion.div>
         </div>

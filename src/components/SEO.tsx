@@ -7,19 +7,24 @@ interface SEOProps {
   description?: string;
   image?: string;
   article?: boolean;
+  canonical?: string;
+  publishedTime?: string;
+  authorName?: string;
 }
 
-export default function SEO({ title, description, image, article }: SEOProps) {
+export default function SEO({ title, description, image, article, canonical, publishedTime, authorName }: SEOProps) {
   const { settings } = useSiteSettings();
   
-  const defaultTitle = "Diffuse Agency | Elite Web Engineering";
-  const defaultDesc = "Transformando visão em realidade digital através de engenharia sênior e design de alta fidelidade.";
+  const siteName = settings.agency_name || "Diffuse Agency";
+  const defaultTitle = `${siteName} | Elite Web Engineering`;
+  const defaultDesc = settings.seo_description || "Transformando visão em realidade digital através de engenharia sênior e design de alta fidelidade.";
   
   const seo = {
-    title: title || settings.seo_title || defaultTitle,
-    description: description || settings.seo_description || defaultDesc,
+    title: title ? `${title} | ${siteName}` : settings.seo_title || defaultTitle,
+    description: description || defaultDesc,
     image: image || settings.seo_image || '',
     url: window.location.href,
+    canonical: canonical || window.location.href.split('?')[0],
   };
 
   return (
@@ -27,35 +32,56 @@ export default function SEO({ title, description, image, article }: SEOProps) {
       <title>{seo.title}</title>
       <meta name="description" content={seo.description} />
       <meta name="image" content={seo.image} />
+      <link rel="canonical" href={seo.canonical} />
       
-      {seo.url && <meta property="og:url" content={seo.url} />}
-      {(article ? true : null) && <meta property="og:type" content="article" />}
-      {seo.title && <meta property="og:title" content={seo.title} />}
-      {seo.description && <meta property="og:description" content={seo.description} />}
+      <meta property="og:site_name" content={siteName} />
+      <meta property="og:url" content={seo.url} />
+      <meta property="og:type" content={article ? "article" : "website"} />
+      <meta property="og:title" content={seo.title} />
+      <meta property="og:description" content={seo.description} />
       {seo.image && <meta property="og:image" content={seo.image} />}
       
+      {article && publishedTime && (
+        <meta property="article:published_time" content={publishedTime} />
+      )}
+      {article && authorName && (
+        <meta property="article:author" content={authorName} />
+      )}
+      
       <meta name="twitter:card" content="summary_large_image" />
-      {seo.title && <meta name="twitter:title" content={seo.title} />}
-      {seo.description && <meta name="twitter:description" content={seo.description} />}
+      <meta name="twitter:title" content={seo.title} />
+      <meta name="twitter:description" content={seo.description} />
       {seo.image && <meta name="twitter:image" content={seo.image} />}
 
       <script type="application/ld+json">
         {JSON.stringify({
           "@context": "https://schema.org",
-          "@type": article ? "Article" : "Organization",
-          "name": settings.agency_name || "Diffuse Agency",
-          "headline": seo.title,
+          "@type": article ? "BlogPosting" : "Organization",
+          "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": seo.url
+          },
+          "name": siteName,
+          "headline": title || seo.title,
           "description": seo.description,
           "image": seo.image,
           "url": seo.url,
           ...(article ? {
-            "datePublished": new Date().toISOString(),
+            "datePublished": publishedTime || new Date().toISOString(),
             "author": {
               "@type": "Person",
-              "name": "Diffuse Agency Editorial"
+              "name": authorName || siteName
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": siteName,
+              "logo": {
+                "@type": "ImageObject",
+                "url": settings.agency_logo || ""
+              }
             }
           } : {
-            "logo": seo.image || "https://diffuse.agency/logo.png"
+            "logo": settings.agency_logo || ""
           })
         })}
       </script>

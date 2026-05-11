@@ -9,9 +9,12 @@ export default defineConfig(({mode}) => {
   const repoName = process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/';
   
   return {
-    base: '/',
+    base: './',
     plugins: [react(), tailwindcss(), VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5000000 // 5MB
+      },
       manifest: {
         name: 'DIFFUSE - Soluções',
         short_name: 'DIFFUSE',

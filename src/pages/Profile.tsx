@@ -5,13 +5,14 @@ import { auth, db } from '../lib/firebase';
 import { 
     User as UserIcon, LogOut, Mail, Hash, Shield, 
     Settings, Briefcase, Calendar, ChevronRight,
-    ArrowRight, X, Check, Loader2
+    ArrowRight, X, Check, Loader2, Camera, User
 } from 'lucide-react';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { motion, AnimatePresence } from 'motion/react';
 import SEO from '../components/SEO';
 import { cn } from '../lib/utils';
+import MediaLibrary from '../components/MediaLibrary';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -23,6 +24,8 @@ export default function Profile() {
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [photoURL, setPhotoURL] = useState(currentUser?.photoURL || '');
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
@@ -86,7 +89,16 @@ export default function Profile() {
     setMessage(null);
     
     try {
-        await updateProfile(auth.currentUser, { displayName });
+        await updateProfile(auth.currentUser, { displayName, photoURL });
+        
+        // Also update in a users collection if it exists for persistent custom data
+        try {
+            const userRef = doc(db, 'users', auth.currentUser.uid);
+            await updateDoc(userRef, { displayName, photoURL });
+        } catch (e) {
+            // Ignore if users collection doesn't exist yet
+        }
+
         // Force refresh user state to update UI
         setCurrentUser({ ...auth.currentUser });
         setMessage({ text: 'Perfil atualizado com sucesso!', type: 'success' });
@@ -125,10 +137,22 @@ export default function Profile() {
           <div className="lg:col-span-1 space-y-6">
             <div className="glass-card p-8 border-white/10">
                 <div className="flex flex-col items-center text-center">
-                    <div className="w-24 h-24 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4 p-1 shadow-xl shadow-blue-500/20">
-                        <div className="w-full h-full bg-brand-bg rounded-full flex items-center justify-center">
-                            <UserIcon size={40} className="text-white" />
+                    <div className="relative group">
+                        <div className="w-24 h-24 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4 p-1 shadow-xl shadow-blue-500/20">
+                            <div className="w-full h-full bg-brand-bg rounded-full flex items-center justify-center overflow-hidden">
+                                {currentUser.photoURL ? (
+                                    <img src={currentUser.photoURL} alt={currentUser.displayName || ''} className="w-full h-full object-cover" />
+                                ) : (
+                                    <UserIcon size={40} className="text-white" />
+                                )}
+                            </div>
                         </div>
+                        <button 
+                            onClick={() => setShowSettings(true)}
+                            className="absolute bottom-4 right-0 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Camera size={14} />
+                        </button>
                     </div>
                     <h1 className="text-xl font-bold text-white uppercase tracking-widest">{currentUser.displayName || 'Cliente Diffuse'}</h1>
                     <p className="text-gray-500 text-xs mt-1 font-mono uppercase tracking-widest">Portal do Cliente</p>
@@ -298,6 +322,21 @@ export default function Profile() {
                     </div>
 
                     <form onSubmit={handleUpdateProfile} className="space-y-6">
+                        <div className="flex justify-center mb-8">
+                             <div className="relative group cursor-pointer" onClick={() => setShowMediaPicker(true)}>
+                                <div className="w-24 h-24 rounded-full border-2 border-white/10 overflow-hidden bg-white/5 flex items-center justify-center">
+                                    {photoURL ? (
+                                        <img src={photoURL} alt="Avatar Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <User size={40} className="text-white/20" />
+                                    )}
+                                </div>
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                                    <Camera size={20} className="text-white" />
+                                </div>
+                             </div>
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Seu Nome</label>
                             <input 
@@ -355,6 +394,35 @@ export default function Profile() {
                     <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
                 </motion.div>
             </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMediaPicker && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+             <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowMediaPicker(false)}
+                className="absolute inset-0 bg-black/90 backdrop-blur-md"
+             />
+             <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative w-full max-w-4xl h-[80vh] z-10"
+             >
+                <MediaLibrary 
+                    isPicker 
+                    onClose={() => setShowMediaPicker(false)} 
+                    onSelect={(url) => {
+                        setPhotoURL(url);
+                        setShowMediaPicker(false);
+                    }}
+                />
+             </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

@@ -1,21 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
 import { 
     ChevronLeft, Calendar, FileText, CheckCircle2, 
     Clock, Download, CreditCard, MessageSquare,
-    ExternalLink, Briefcase, Settings, Loader2
+    ExternalLink, Briefcase, Settings, Loader2, Send,
+    UserCircle
 } from 'lucide-react';
 import ProjectFileVault from '../components/ProjectFileVault';
-import { motion } from 'motion/react';
+import { cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 
 export default function ProjectDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     if (!id) return;
@@ -43,7 +58,43 @@ export default function ProjectDetails() {
     };
 
     fetchProjectData();
+
+    // Set up real-time messages listener
+    const messagesQuery = query(
+      collection(db, `projects/${id}/messages`),
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `projects/${id}/messages`);
+    });
+
+    return () => unsubscribe();
   }, [id, navigate]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !id || !auth.currentUser) return;
+
+    setSending(true);
+    try {
+      await addDoc(collection(db, `projects/${id}/messages`), {
+        text: newMessage,
+        senderId: auth.currentUser.uid,
+        senderName: auth.currentUser.displayName || 'Cliente',
+        senderPhoto: auth.currentUser.photoURL || '',
+        createdAt: serverTimestamp(),
+        type: 'client'
+      });
+      setNewMessage('');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `projects/${id}/messages`);
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -59,13 +110,21 @@ export default function ProjectDetails() {
 
   const currentStep = project.current_step !== undefined ? Number(project.current_step) : 0;
 
-  const timelineSteps = [
+  const defaultTimelineSteps = [
     { label: 'Discovery', status: currentStep > 0 ? 'completed' : currentStep === 0 ? 'current' : 'pending' },
     { label: 'Planejamento', status: currentStep > 1 ? 'completed' : currentStep === 1 ? 'current' : 'pending' },
     { label: 'Desenvolvimento', status: currentStep > 2 ? 'completed' : currentStep === 2 ? 'current' : 'pending' },
     { label: 'QA / Testes', status: currentStep > 3 ? 'completed' : currentStep === 3 ? 'current' : 'pending' },
     { label: 'Entrega', status: currentStep >= 4 ? 'completed' : 'pending' },
   ];
+
+  const timelineSteps = project.timeline && project.timeline.length > 0 
+    ? project.timeline.map((step: any, idx: number) => ({
+        label: step.label,
+        status: step.completed ? 'completed' : (idx === currentStep ? 'current' : 'pending'),
+        description: step.description
+      }))
+    : defaultTimelineSteps;
 
   return (
     <div className="pt-32 pb-20 px-4 min-h-screen">
@@ -126,11 +185,38 @@ export default function ProjectDetails() {
                                     }`}>
                                         {step.status === 'completed' ? <CheckCircle2 size={16} /> : <Clock size={16} />}
                                     </div>
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                                        step.status === 'completed' || step.status === 'current' ? 'text-white' : 'text-gray-700'
-                                    }`}>
-                                        {step.label}
-                                    </span>
+                                    <div className="text-center">
+                                        <span className={`text-[10px] font-bold uppercase tracking-widest block ${
+                                            step.status === 'completed' || step.status === 'current' ? 'text-white' : 'text-gray-700'
+                                        }`}>
+                                            {step.label}
+                                        </span>
+                                        {step.description && (
+                                            <span className="text-[8px] text-gray-600 mt-1 block max-w-[80px] leading-tight">{step.description}</span>
+                                        )}
+                                        
+                                        {/* Render Subtasks if exist in the raw project timeline for this index */}
+                                        {project.timeline?.[idx]?.tasks && project.timeline[idx].tasks.length > 0 && (
+                                          <div className="mt-4 flex flex-col items-start gap-1 w-max mx-auto bg-white/[0.02] p-2 rounded-lg border border-white/5">
+                                            {project.timeline[idx].tasks.map((task: any, tIdx: number) => (
+                                              <div key={tIdx} className="flex items-center gap-2">
+                                                <div className={cn(
+                                                  "w-2 h-2 rounded-sm border",
+                                                  task.completed ? "bg-blue-500 border-blue-500" : "border-white/20"
+                                                )}>
+                                                  {task.completed && <CheckCircle2 size={6} className="text-white" />}
+                                                </div>
+                                                <span className={cn(
+                                                  "text-[7px] uppercase tracking-wider",
+                                                  task.completed ? "text-gray-400 line-through" : "text-gray-600"
+                                                )}>
+                                                  {task.label}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -145,6 +231,82 @@ export default function ProjectDetails() {
                     </div>
                     
                     <ProjectFileVault assets={project.assets || []} />
+                </div>
+
+                {/* Communication Central */}
+                <div className="glass-card p-8 border-white/10 flex flex-col h-[600px]">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500/10 text-blue-500 rounded-xl">
+                                <MessageSquare size={18} />
+                            </div>
+                            <h3 className="text-white font-bold uppercase tracking-widest text-xs">Central de Comunicação</h3>
+                        </div>
+                        <span className="text-[8px] text-gray-500 uppercase font-black bg-white/5 px-2 py-1 rounded">Criptografia Ponta a Ponta</span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto mb-6 pr-4 space-y-4 scrollbar-hide py-4">
+                        {messages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                                <MessageSquare size={40} className="mb-4" />
+                                <p className="text-[10px] uppercase tracking-widest font-bold">Inicie uma conversa sobre este projeto</p>
+                            </div>
+                        ) : (
+                            messages.map((msg, idx) => {
+                                const isMe = msg.senderId === auth.currentUser?.uid;
+                                return (
+                                    <div key={idx} className={cn(
+                                        "flex gap-3 max-w-[85%]",
+                                        isMe ? "ml-auto flex-row-reverse" : ""
+                                    )}>
+                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 mt-2">
+                                            {msg.senderPhoto ? (
+                                                <img src={msg.senderPhoto} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-white/20">
+                                                    <UserCircle size={20} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className={cn(
+                                                "p-4 rounded-3xl text-sm",
+                                                isMe 
+                                                ? "bg-blue-600 text-white rounded-tr-none" 
+                                                : "bg-white/5 border border-white/10 text-gray-200 rounded-tl-none"
+                                            )}>
+                                                {msg.text}
+                                            </div>
+                                            <p className={cn(
+                                                "text-[8px] text-gray-600 uppercase font-bold",
+                                                isMe ? "text-right" : "text-left"
+                                            )}>
+                                                {msg.senderName} • {msg.createdAt ? new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sendo enviado...'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="relative mt-auto">
+                        <input 
+                            type="text" 
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Digite sua mensagem direta para a Diffuse..."
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white placeholder-gray-600 outline-none focus:border-blue-500/50 transition-all pr-14"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={!newMessage.trim() || sending}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-500 transition-all disabled:opacity-50 disabled:grayscale"
+                        >
+                            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                        </button>
+                    </form>
                 </div>
             </div>
 

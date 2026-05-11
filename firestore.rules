@@ -109,13 +109,16 @@ service cloud.firestore {
              doc.title is string && doc.title.size() <= 200 &&
              (doc.get('status', 'active') in ['active', 'completed', 'on-hold', 'discovery']) &&
              (doc.get('current_step', 0) is int) &&
+             (doc.get('timeline', []) is list) &&
              (doc.get('assets', []) is list);
     }
 
     function isValidBilling(doc) {
-      return doc.keys().hasAll(['project_id', 'amount']) &&
+      return doc.keys().hasAll(['project_id', 'amount', 'client_email']) &&
              doc.project_id is string && isValidId(doc.project_id) &&
+             doc.client_email is string && doc.client_email.size() <= 100 &&
              doc.amount is number &&
+             (doc.get('description', '') is string) &&
              (doc.get('status', 'unpaid') in ['paid', 'unpaid', 'overdue']);
     }
 
@@ -252,8 +255,8 @@ service cloud.firestore {
     }
 
     match /billing/{billId} {
-      allow get: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/projects/$(existing().project_id)).data.client_email == request.auth.token.email);
-      allow list: if isAdmin();
+      allow get: if isAdmin() || (isSignedIn() && existing().client_email == request.auth.token.email);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.client_email == request.auth.token.email);
       allow create: if isAdmin() && isValidBilling(incoming()) && isValidId(billId) &&
                        incoming().createdAt == request.time;
       allow update: if isAdmin() && isValidBilling(incoming()) &&

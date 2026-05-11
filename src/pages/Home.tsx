@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getDocs, collection, query, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
 import { cn } from '../lib/utils';
@@ -43,7 +44,7 @@ export default function Home() {
         const servSnap = await getDocs(query(collection(db, 'services'), limit(4)));
         setServices(servSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (e) {
-        console.error('Error fetching data', e);
+        handleFirestoreError(e, OperationType.LIST, 'testimonials/services');
       }
     };
     fetchData();

@@ -1,49 +1,58 @@
-# Especificação Técnica: Finalização do Sistema DIFFUSE
-**Data de Geração:** 11/05/2026 - 08:48:57 (Horário de Brasília)
+# Especificação Técnica de Implementações Pendentes
+**Data/Hora (Brasília):** 11/05/2026 13:35
 
-Este documento detalha as especificações técnicas para a implementação dos itens identificados no `analytics/report.md`.
+Este documento detalha 'somente o que falta implementar' com base no `analytics/report.md`.
 
-## 1. Analytics & Inteligência (Dashboard)
+---
 
-### Página: `AdminOverview.tsx`
-- **Comportamento:** Refatorar a prop `metrics.chartData` no `Admin.tsx` para realizar um reduce dinâmico na coleção `billing`.
-- **Lógica:** Filtrar faturas por `status === 'paid'`, agrupar por mês/ano e somar o total.
-- **Componente:** `Recharts` deve exibir o nome do mês abreviado no eixo X.
+## 1. Modificações em Páginas (Page)
 
-## 2. Experiência do Cliente (CRM Central)
+### 1.1. Blog.tsx (Busca e Filtro)
+- **Comportamento:** Adicionar estado local para `searchTerm` e `activeCategory`.
+- **Lógica:** Refatorar o `useEffect` para incluir clausulas `where` dinâmicas ou filtragem em memória (client-side) para volumes pequenos/médios de posts.
+- **UI:** Conectar o `input` de busca ao estado e aplicar animações de entrada/saída nos cards filtrados usando `motion/layout`.
 
-### Página: `ClientDashboard.tsx` (Nova)
-- **Acesso:** Rota `/meu-projeto` deve evoluir para `/dashboard-cliente`.
-- **Conteúdo:** 
-  - Listagem de todos os projetos vinculados ao e-mail do cliente logado.
-  - Seção de "Faturas Pendentes" e "Histórico de Pagamentos".
-  - Acesso centralizado à `MediaLibrary` do cliente.
+### 1.2. BlogPost.tsx (Social Share)
+- **Comportamento:** Implementar `navigator.share()` API para mobile e links de fallback (WhatsApp, LinkedIn, Twitter) para desktop.
+- **Componentes:** Abstrair para um componente `<ShareActions />`.
 
-## 3. Auditoria e Segurança (Admin)
+### 1.3. NotFound.tsx (Página 404)
+- **Nova Página:** Criar `src/pages/NotFound.tsx`.
+- **UI:** Design brutalista/minimalista com botão de retorno à `Home`.
+- **Rota:** Adicionar `{ path: '*', element: <NotFound /> }` no `App.tsx`.
 
-### Coleção Firestore: `activity_logs`
-- **Schema:** `{ userId: string, action: string, targetId: string, timestamp: Timestamp, details: string }`.
-- **Behavior:** Adicionar um middleware ou hook global nas funções de escrita do `CMSManager` e `Admin` para registrar automaticamente cada `create`, `update` e `delete`.
+---
 
-## 4. Marketing & Conversão
+## 2. Comportamentos e Lógica (Behavior)
 
-### Componente: `NewsletterForm.tsx` (Novo)
-- **Localização:** Footer da aplicação pública.
-- **Behavior:** Registro na coleção `leads_newsletter` com validação de formato de e-mail e feedback de sucesso via animação.
-- **Admin:** Aba dedicada no `CMSManager` ou `crm` para exportação de lista CSV.
+### 2.1. Dynamic Favicon (useFavicon)
+- **Hook:** Criar `src/hooks/useFavicon.ts`.
+- **Lógica:** Escutar mudanças no `settings.site_favicon` (vindo do `useSiteSettings`) e atualizar o `href` do elemento `link[rel="icon"]` no `document.head`.
 
-## 5. Rich Content (Portfólio)
+### 2.2. Navigation Guard Avançado
+- **Guia:** Refatorar `src/App.tsx` para envolver rotas sensíveis em um wrapper que verifica `navigation.isActive` (Firestore) antes de renderizar, redirecionando para a `Home` se a rota estiver desativada pelo Admin.
 
-### Componente: `TechStackPills.tsx` (Novo)
-- **Uso:** Em `ProjectDetailPublic.tsx`.
-- **Estética:** Tags minimalistas, monocromáticas, usando `font-mono`.
+### 2.3. Email Triggers (Arquitetura)
+- **Estratégia:** Criar uma coleção `mail_queue` para que o frontend possa postar solicitações de envio, permitindo integração futura com Cloud Functions/Resend/SendGrid sem travar a UI.
 
-### Comportamento: SEO Avançado
-- **CMS:** Adicionar campos `og_image` e `og_description` em `posts` e `projects`.
-- **SEO.tsx:** Atualizar o componente para consumir esses campos prioritariamente se disponíveis.
+---
 
-## 6. Configurações de Sistema
+## 3. Componentes e Refatoração (Component)
 
-### Funcionalidade: Maintenance Mode
-- **Persistence:** Campo `is_maintenance_mode` na coleção `settings`.
-- **Behavior:** Se ativo, redirecionar todas as rotas públicas (exceto `/admin`) para `pages/Maintenance.tsx`.
+### 3.1. Skeleton Loaders
+- **Componentes:** Criar `src/components/ui/Skeleton.tsx`.
+- **Uso:** Substituir `Loader2` por Skeletons no `Blog.tsx` e `ProjectList.tsx` para evitar saltos de layout durante o carregamento inicial de dados.
+
+### 3.2. Breadcrumbs Global
+- **Refatoração:** Garantir que o componente em `src/components/Breadcrumbs.tsx` aceite caminhos dinâmicos e seja aplicado consistentemente em:
+  - `DetailedFinance.tsx`
+  - `ProjectDetails.tsx` (Admin e Cliente)
+  - `CMSManager.tsx` (Sub-abas)
+
+---
+
+## 4. Validação e Telemetria
+- **Error Handlers:** Revisão em massa em `CMSManager.tsx` e `Admin.tsx` para garantir que TODOS os blocos `catch` chamem `handleFirestoreError`.
+
+---
+*Especificação gerada para o ciclo final de desenvolvimento.*

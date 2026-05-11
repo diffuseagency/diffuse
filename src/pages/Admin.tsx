@@ -20,6 +20,7 @@ import InvoiceGenerator from '../components/InvoiceGenerator';
 import ProjectAssetManager from '../components/ProjectAssetManager';
 import LeadNotifier from '../components/LeadNotifier';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { 
   collection, 
   getDocs, 
@@ -38,6 +39,7 @@ const AdminSidebar = () => {
   const menuItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Conteúdo Site', path: '/admin/cms', icon: Edit },
+    { name: 'Newsletter', path: '/admin/newsletter', icon: Mail },
     { name: 'Mensagens', path: '/admin/mensagens', icon: MessageSquare },
     { name: 'Clientes', path: '/admin/clientes', icon: Users },
     { name: 'Projetos', path: '/admin/projetos', icon: Briefcase },
@@ -196,50 +198,52 @@ const ClientList = ({ clients, onEdit, onAdd, onDelete }: { clients: any[], onEd
   <div className="p-8 animate-in fade-in duration-500">
     <TableHeader title="Gerenciamento de Clientes" results={clients.length} onAdd={onAdd} />
     <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
-      <table className="w-full text-left">
-        <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
-          <tr>
-            <th className="px-6 py-4 font-normal">Nome / Empresa</th>
-            <th className="px-6 py-4 font-normal">E-mail</th>
-            <th className="px-6 py-4 font-normal">Status</th>
-            <th className="px-6 py-4 font-normal">Data</th>
-            <th className="px-6 py-4 font-normal text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">
-          {clients.map((client) => (
-            <tr key={client.id} className="hover:bg-white/5 transition-all group">
-              <td className="px-6 py-4">
-                <div className="flex flex-col">
-                  <span className="font-medium text-white">{client.name}</span>
-                  <span className="text-xs text-white/40">{client.company}</span>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-sm text-white/60">{client.email}</td>
-              <td className="px-6 py-4">
-                <span className="px-2 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded text-[10px] uppercase font-bold">Ativo</span>
-              </td>
-              <td className="px-6 py-4 text-sm text-white/40">{formatDate(client.createdAt || client.created_at)}</td>
-              <td className="px-6 py-4 text-right">
-                <div className="flex justify-end gap-2">
-                  <button 
-                    onClick={() => onEdit(client)}
-                    className="text-white/20 hover:text-white transition-all text-xs border border-white/10 px-3 py-1 rounded"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    onClick={() => onDelete(client.id)}
-                    className="p-1.5 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
+            <tr>
+              <th className="px-6 py-4 font-normal">Nome / Empresa</th>
+              <th className="px-6 py-4 font-normal">E-mail</th>
+              <th className="px-6 py-4 font-normal">Status</th>
+              <th className="px-6 py-4 font-normal">Data</th>
+              <th className="px-6 py-4 font-normal text-right">Ações</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {clients.map((client) => (
+              <tr key={client.id} className="hover:bg-white/5 transition-all group">
+                <td className="px-6 py-4">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-white">{client.name}</span>
+                    <span className="text-xs text-white/40">{client.company}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-sm text-white/60 whitespace-nowrap">{client.email}</td>
+                <td className="px-6 py-4">
+                  <span className="px-2 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded text-[10px] uppercase font-bold">Ativo</span>
+                </td>
+                <td className="px-6 py-4 text-sm text-white/40 whitespace-nowrap">{formatDate(client.createdAt || client.created_at)}</td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button 
+                      onClick={() => onEdit(client)}
+                      className="text-white/20 hover:text-white transition-all text-xs border border-white/10 px-3 py-1 rounded"
+                    >
+                      Editar
+                    </button>
+                    <button 
+                      onClick={() => onDelete(client.id)}
+                      className="p-1.5 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 );
@@ -301,58 +305,177 @@ const BillingList = ({ billing, onEdit, onAdd, onDelete, onPreview }: { billing:
       </Link>
     </div>
     <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
-      <table className="w-full text-left">
-        <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
-          <tr>
-            <th className="px-6 py-4 font-normal">Projeto</th>
-            <th className="px-6 py-4 font-normal">Valor</th>
-            <th className="px-6 py-4 font-normal">Vencimento</th>
-            <th className="px-6 py-4 font-normal">Status</th>
-            <th className="px-6 py-4 font-normal text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">
-          {billing.map((bill) => (
-            <tr key={bill.id} className="hover:bg-white/5 transition-all group">
-              <td className="px-6 py-4 text-sm font-medium text-white">{bill.project_title}</td>
-              <td className="px-6 py-4 text-sm font-bold text-white">R$ {bill.amount.toLocaleString()}</td>
-              <td className="px-6 py-4 text-sm text-white/40">{new Date(bill.due_date).toLocaleDateString()}</td>
-              <td className="px-6 py-4">
-               <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold border ${
-                  bill.status === 'paid' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'
-                }`}>
-                  {bill.status === 'paid' ? 'Pago' : 'Pendente'}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-right">
-                <div className="flex justify-end gap-3">
-                  <button 
-                    onClick={() => onPreview(bill)}
-                    className="text-blue-500 hover:text-white transition-all text-[10px] uppercase font-bold border border-blue-500/20 px-3 py-1 rounded"
-                  >
-                    Preview
-                  </button>
-                  <button 
-                    onClick={() => onEdit(bill)}
-                    className="text-white/60 hover:text-white transition-all rounded p-2 text-xs uppercase font-bold tracking-widest"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    onClick={() => onDelete(bill.id)}
-                    className="p-2 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </td>
+      <div className="overflow-x-auto scrollbar-hide">
+        <table className="w-full text-left">
+          <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
+            <tr>
+              <th className="px-6 py-4 font-normal">Projeto</th>
+              <th className="px-6 py-4 font-normal">Valor</th>
+              <th className="px-6 py-4 font-normal">Vencimento</th>
+              <th className="px-6 py-4 font-normal">Status</th>
+              <th className="px-6 py-4 font-normal text-right">Ações</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {billing.map((bill) => (
+              <tr key={bill.id} className="hover:bg-white/5 transition-all group">
+                <td className="px-6 py-4 text-sm font-medium text-white whitespace-nowrap">{bill.project_title}</td>
+                <td className="px-6 py-4 text-sm font-bold text-white whitespace-nowrap">R$ {bill.amount.toLocaleString()}</td>
+                <td className="px-6 py-4 text-sm text-white/40 whitespace-nowrap">{new Date(bill.due_date).toLocaleDateString()}</td>
+                <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold border ${
+                    bill.status === 'paid' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'
+                  }`}>
+                    {bill.status === 'paid' ? 'Pago' : 'Pendente'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right whitespace-nowrap">
+                  <div className="flex justify-end gap-3">
+                    <button 
+                      onClick={() => onPreview(bill)}
+                      className="text-blue-500 hover:text-white transition-all text-[10px] uppercase font-bold border border-blue-500/20 px-3 py-1 rounded"
+                    >
+                      Preview
+                    </button>
+                    <button 
+                      onClick={() => onEdit(bill)}
+                      className="text-white/60 hover:text-white transition-all rounded p-2 text-xs uppercase font-bold tracking-widest"
+                    >
+                      Editar
+                    </button>
+                    <button 
+                      onClick={() => onDelete(bill.id)}
+                      className="p-2 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 );
+
+const NewsletterLeadList = () => {
+    const { data: leads, loading } = useFirestoreCollection<any>('newsletter_leads', [orderBy('createdAt', 'desc')]);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string } | null>(null);
+
+    const exportToCSV = () => {
+        if (!leads || leads.length === 0) return;
+        
+        // Headers
+        const headers = ['Email', 'Status', 'Data Inscrição'];
+        
+        // Format rows
+        const rows = leads.map(lead => [
+            lead.email,
+            lead.status || 'active',
+            lead.createdAt?.seconds ? new Date(lead.createdAt.seconds * 1000).toLocaleString() : ''
+        ]);
+
+        // Build CSV string
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `leads_newsletter_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    if (loading) return <div className="p-8">Carregando leads...</div>;
+
+    return (
+        <div className="p-8 animate-in fade-in duration-500">
+            <ConfirmationModal 
+                isOpen={!!deleteConfirm}
+                onClose={() => setDeleteConfirm(null)}
+                onConfirm={async () => {
+                    if (deleteConfirm) {
+                        await deleteFirestoreDoc('newsletter_leads', deleteConfirm.id);
+                        setDeleteConfirm(null);
+                    }
+                }}
+                title="Excluir Lead"
+                message="Deseja realmente remover este e-mail da lista? O usuário deixará de receber comunicações."
+                confirmText="Excluir"
+            />
+
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h2 className="text-2xl font-medium">Newsletter Leads</h2>
+                    <p className="text-white/40 text-sm mt-1">{leads.length} inscritos confirmados</p>
+                </div>
+                <button 
+                    onClick={exportToCSV}
+                    disabled={leads.length === 0}
+                    className="bg-blue-500 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-blue-600 transition-all disabled:opacity-50"
+                >
+                    <Mail size={16} /> Exportar CSV
+                </button>
+            </div>
+
+            <div className="bg-zinc-900 border border-white/5 rounded-[32px] overflow-hidden">
+                <div className="overflow-x-auto scrollbar-hide">
+                    <table className="w-full text-left">
+                        <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/40">
+                            <tr>
+                                <th className="px-6 py-4 font-bold">E-mail</th>
+                                <th className="px-6 py-4 font-bold">Status</th>
+                                <th className="px-6 py-4 font-bold">Data</th>
+                                <th className="px-6 py-4 font-bold text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {leads.map((lead) => (
+                                <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors group">
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-sm text-white">{lead.email}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-2 py-0.5 bg-green-500/10 text-green-500 border border-green-500/20 rounded text-[8px] uppercase font-bold tracking-widest">
+                                            {lead.status || 'Ativo'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-[10px] text-white/40 font-mono whitespace-nowrap">
+                                        {formatDate(lead.createdAt)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button 
+                                            onClick={() => setDeleteConfirm({ id: lead.id })}
+                                            className="p-2 text-red-500/40 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {leads.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-20 text-center text-gray-500 italic text-[10px] uppercase tracking-widest">
+                                        Nenhum lead inscrito até o momento.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const MessageList = () => {
     const { data: messages, loading } = useFirestoreCollection<any>('messages', [orderBy('createdAt', 'desc')]);
@@ -404,6 +527,18 @@ const MessageList = () => {
                                     <p className="text-xs font-bold text-gray-200 uppercase tracking-[0.2em] mb-1">{msg.subject}</p>
                                     <p className="text-gray-400 text-sm leading-relaxed">{msg.message}</p>
                                 </div>
+                                {msg.source_url && (
+                                    <div className="flex flex-wrap gap-4 pt-2">
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Origem do Lead</span>
+                                            <a href={msg.source_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-white transition-colors truncate max-w-xs">{msg.source_url}</a>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Referrer</span>
+                                            <span className="text-[10px] text-gray-400 italic">{msg.referrer || 'direto'}</span>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-4 pt-4">
                                     <p className="text-[10px] text-white/20 uppercase font-mono">
                                         {formatDate(msg.createdAt)}
@@ -499,7 +634,7 @@ export default function Admin() {
         setModalType(null);
         setEditingData(null);
     } catch (error) {
-        console.error("Error saving data:", error);
+        handleFirestoreError(error, editingData?.id ? OperationType.UPDATE : OperationType.CREATE, modalType === 'client' ? 'clients' : modalType === 'project' ? 'projects' : 'billing');
     } finally {
         setLoading(false);
     }
@@ -525,7 +660,7 @@ export default function Admin() {
         }
         setDeleteConfirm(null);
     } catch (e) {
-        console.error("Delete error:", e);
+        handleFirestoreError(e, OperationType.DELETE, deleteConfirm?.collection || 'unknown');
     } finally {
         setLoading(false);
     }
@@ -594,6 +729,7 @@ export default function Admin() {
             />
           } />
           <Route path="cms" element={<CMSManager />} />
+          <Route path="newsletter" element={<NewsletterLeadList />} />
           <Route path="mensagens" element={<MessageList />} />
           <Route path="clientes" element={<ClientList clients={clients} onAdd={() => setModalType('client')} onEdit={(c) => { setEditingData(c); setModalType('client'); }} onDelete={(id) => setDeleteConfirm({ id, collection: 'clients' })} />} />
           <Route path="projetos" element={<ProjectList projects={projects} onAdd={() => setModalType('project')} onEdit={(p) => { setEditingData(p); setModalType('project'); }} onDelete={(id) => setDeleteConfirm({ id, collection: 'projects' })} onManageAssets={(p) => setAssetProject(p)} />} />

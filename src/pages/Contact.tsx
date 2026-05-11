@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useState } from 'react';
 import { addFirestoreDoc } from '../lib/cmsHooks';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { useSiteSettings } from '../lib/useSiteSettings';
 
 const contactSchema = z.object({
@@ -13,6 +14,7 @@ const contactSchema = z.object({
   email: z.string().email('E-mail inválido'),
   subject: z.string().min(5, 'Assunto muito curto'),
   message: z.string().min(10, 'Mensagem deve ter pelo menos 10 caracteres'),
+  confirm_email: z.string().optional(), // Honeypot field
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -28,16 +30,29 @@ export default function Contact() {
   });
 
   const onSubmit = async (data: ContactFormData) => {
+    // Honeypot check
+    if (data.confirm_email) {
+      console.warn("Honeypot filled - Bot detected");
+      setIsSuccess(true); // Pretend success to bot
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorStatus(null);
     try {
-      await addFirestoreDoc('messages', { ...data, read: false });
+      const payload = {
+        ...data,
+        read: false,
+        source_url: window.location.href,
+        referrer: document.referrer || 'direto',
+        createdAt: new Date().toISOString()
+      };
+      await addFirestoreDoc('messages', payload);
       setIsSuccess(true);
       reset();
       setTimeout(() => setIsSuccess(false), 5000);
     } catch (error) {
-      console.error(error);
-      setErrorStatus('Erro ao enviar mensagem. Tente novamente mais tarde.');
+      handleFirestoreError(error, OperationType.WRITE, 'messages');
     } finally {
       setIsSubmitting(false);
     }
@@ -172,6 +187,16 @@ export default function Contact() {
                   className="w-full bg-transparent border-b border-white/10 py-4 focus:outline-none focus:border-white transition-all font-light text-xl resize-none hover:bg-white/5"
                 />
                 {errors.message && <p className="text-red-500 text-[10px] uppercase tracking-tight">{errors.message.message}</p>}
+              </div>
+
+              {/* Honeypot field - Hidden from users */}
+              <div className="hidden pointer-events-none opacity-0 h-0 w-0" aria-hidden="true">
+                <input 
+                   {...register('confirm_email')}
+                   tabIndex={-1}
+                   autoComplete="off"
+                   placeholder="Não preencha este campo"
+                />
               </div>
 
               {errorStatus && (

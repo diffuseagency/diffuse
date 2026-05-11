@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Loader2, Calendar, Tag, User, Quote, ArrowRight } from 'lucide-react';
 import { useSiteSettings } from '../lib/useSiteSettings';
 import SEO from '../components/SEO';
 import TechStackPills from '../components/TechStackPills';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function ProjectDetailPublic() {
   const { slug } = useParams();
@@ -31,7 +33,7 @@ export default function ProjectDetailPublic() {
           setError(true);
         }
       } catch (err) {
-        console.error("Error fetching project:", err);
+        handleFirestoreError(err, OperationType.GET, `portfolio/${slug}`);
         setError(true);
       } finally {
         setLoading(false);
@@ -62,9 +64,9 @@ export default function ProjectDetailPublic() {
   return (
     <div className="bg-brand-bg min-h-screen">
       <SEO 
-        title={`${project.title} | Case Study | ${settings.agency_name || 'Diffuse'}`}
-        description={project.full_description || project.title}
-        image={project.image}
+        title={project.title}
+        description={project.og_description || project.full_description || project.title}
+        image={project.og_image || project.image}
       />
 
       {/* Hero Section */}
@@ -89,10 +91,12 @@ export default function ProjectDetailPublic() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <Link to="/portfolio" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-8 group">
-              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              <span className="text-[10px] uppercase tracking-[0.4em]">Portfólio</span>
-            </Link>
+            <Breadcrumbs 
+              items={[
+                { label: 'Portfólio', path: '/portfolio' },
+                { label: project.title }
+              ]} 
+            />
             <h1 className="text-6xl md:text-8xl font-display font-light tracking-tighter mb-8 max-w-4xl italic">
               {project.title}
             </h1>

@@ -11,25 +11,26 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip
 } from 'recharts';
 import { Link } from 'react-router-dom';
-import { useFirestoreCollection } from '../lib/cmsHooks';
-import { orderBy } from 'firebase/firestore';
+import { useBusinessMetrics } from '../lib/useBusinessMetrics';
+import { jsPDF } from 'jspdf';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
 
 export default function DetailedFinance() {
-  const { data: billing, loading: billingLoading } = useFirestoreCollection<any>('billing', [orderBy('due_date', 'desc')]);
-  const { data: projects } = useFirestoreCollection<any>('projects');
+  const { metrics, loading } = useBusinessMetrics();
 
   const detailedMetrics = useMemo(() => {
-    if (billingLoading) return null;
+    if (loading || !metrics) return null;
 
-    const paid = billing.filter(b => b.status === 'paid');
-    const pending = billing.filter(b => b.status === 'unpaid');
+    const { rawBilling: billing, rawProjects: projects } = metrics;
+
+    const paid = billing.filter((b: any) => b.status === 'paid');
+    const pending = billing.filter((b: any) => b.status === 'unpaid');
 
     // Revenue by category (cross-reference with projects)
     const categoryMap: Record<string, number> = {};
-    billing.forEach(bill => {
-      const project = projects.find(p => p.title === bill.project_title || p.id === bill.projectId);
+    billing.forEach((bill: any) => {
+      const project = projects.find((p: any) => p.title === bill.project_title || p.id === bill.projectId);
       const category = project?.category || 'Outros';
       categoryMap[category] = (categoryMap[category] || 0) + Number(bill.amount);
     });
@@ -45,7 +46,7 @@ export default function DetailedFinance() {
       { year: currentYear, revenue: 0 },
     ];
 
-    billing.forEach(bill => {
+    billing.forEach((bill: any) => {
       const date = new Date(bill.due_date);
       const year = date.getFullYear();
       if (year === currentYear) yearlyData[1].revenue += Number(bill.amount);
@@ -53,16 +54,16 @@ export default function DetailedFinance() {
     });
 
     return {
-      totalPaid: paid.reduce((acc, b) => acc + Number(b.amount), 0),
-      totalPending: pending.reduce((acc, b) => acc + Number(b.amount), 0),
+      ...metrics,
       pieData,
       yearlyData
     };
-  }, [billing, projects, billingLoading]);
+  }, [metrics, loading]);
 
   const exportCSV = () => {
+    if (!metrics) return;
     const headers = ['Projeto', 'Valor', 'Vencimento', 'Status'];
-    const rows = billing.map(b => [
+    const rows = metrics.rawBilling.map((b: any) => [
       b.project_title,
       b.amount,
       b.due_date,
@@ -81,7 +82,28 @@ export default function DetailedFinance() {
     link.click();
   };
 
-  if (billingLoading || !detailedMetrics) {
+  const exportPDF = () => {
+    if (!detailedMetrics) return;
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text('Relatório Financeiro Administrativo - Diffuse Agency', 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Data de Geração: ${new Date().toLocaleDateString()}`, 20, 30);
+    
+    doc.text('Resumo de Métricas:', 20, 50);
+    doc.text(`Receita Total Liquidada: R$ ${detailedMetrics.totalRevenue.toLocaleString()}`, 25, 60);
+    doc.text(`Ticket Médio: R$ ${detailedMetrics.averageTicket.toLocaleString()}`, 25, 70);
+    doc.text(`Taxa de Conversão: ${detailedMetrics.closingRate.toFixed(1)}%`, 25, 80);
+
+    doc.text('Distribuição por Categoria:', 20, 100);
+    detailedMetrics.pieData.forEach((item, idx) => {
+      doc.text(`${item.name}: R$ ${item.value.toLocaleString()}`, 25, 110 + (idx * 10));
+    });
+
+    doc.save(`relatorio_financeiro_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  if (loading || !detailedMetrics) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-brand-bg">
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
@@ -108,7 +130,10 @@ export default function DetailedFinance() {
           >
             <Download size={14} /> Exportar CSV
           </button>
-          <button className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20">
+          <button 
+            onClick={exportPDF}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
+          >
             <ArrowDownToLine size={14} /> Relatório PDF
           </button>
         </div>
@@ -125,7 +150,7 @@ export default function DetailedFinance() {
               <span className="text-[10px] text-green-500 bg-green-500/10 px-2 py-1 rounded font-bold uppercase">+12% vs mês anterior</span>
             </div>
             <h3 className="text-gray-500 text-[10px] uppercase tracking-widest font-bold mb-1">Total Liquidado</h3>
-            <p className="text-4xl font-bold text-white tracking-tighter">R$ {detailedMetrics.totalPaid.toLocaleString()}</p>
+            <p className="text-4xl font-bold text-white tracking-tighter">R$ {detailedMetrics.totalRevenue.toLocaleString()}</p>
           </div>
 
           <div className="glass-card p-8 !rounded-[40px] border-white/10">
@@ -206,14 +231,14 @@ export default function DetailedFinance() {
                 <PieIcon size={32} />
               </div>
               <h4 className="text-white font-bold mb-2 uppercase tracking-widest text-[10px]">Tickets Médios</h4>
-              <p className="text-2xl font-bold">R$ {(detailedMetrics.totalPaid / billing.length || 0).toLocaleString()}</p>
+              <p className="text-2xl font-bold">R$ {detailedMetrics.averageTicket.toLocaleString()}</p>
             </div>
             <div className="glass-card p-8 !rounded-[40px] border-white/10 flex flex-col justify-center items-center text-center">
               <div className="p-4 bg-purple-500/10 text-purple-500 rounded-3xl mb-6">
                 <FileText size={32} />
               </div>
               <h4 className="text-white font-bold mb-2 uppercase tracking-widest text-[10px]">Taxa de Conversão</h4>
-              <p className="text-2xl font-bold">78% <span className="text-green-500 text-xs">+4%</span></p>
+              <p className="text-2xl font-bold">{detailedMetrics.closingRate.toFixed(1)}%</p>
             </div>
           </div>
         </div>

@@ -6,11 +6,17 @@ import { db } from '../lib/firebase';
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState('');
+  const [honey, setHoney] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (honey) {
+      console.warn("Honeypot filled - Bot detected");
+      setStatus('success'); // Pretend success
+      return;
+    }
     if (!email) return;
 
     setStatus('loading');
@@ -27,6 +33,8 @@ export default function NewsletterForm() {
       await addDoc(collection(db, 'newsletter_leads'), {
         email,
         status: 'active',
+        source_url: window.location.href,
+        referrer: document.referrer || 'direto',
         createdAt: serverTimestamp()
       });
 
@@ -68,6 +76,17 @@ export default function NewsletterForm() {
               required
               className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-6 py-4 text-white text-xs font-mono focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-white/20"
             />
+
+            {/* Honeypot field */}
+            <div className="absolute opacity-0 pointer-events-none -z-10 h-0 w-0" aria-hidden="true">
+              <input 
+                type="text" 
+                value={honey}
+                onChange={(e) => setHoney(e.target.value)}
+                tabIndex={-1} 
+                autoComplete="off" 
+              />
+            </div>
             <button
               type="submit"
               disabled={status === 'loading'}
